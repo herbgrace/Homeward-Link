@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
   import NavigationBar from '../lib/NavigationBar.svelte';
 
   let fileInput: HTMLInputElement | null = null;
@@ -21,17 +20,19 @@
 
   <input 
     type="file"
+    accept=".csv, .json"
     bind:this={fileInput}
     onchange={handleFileChange}
     style="display: none"
+    webkitdirectory
   /> 
   <button onclick={triggerFileInput}>
     Select a file
   </button>
 
-  {#if selectedFiles && selectedFiles[0]}
-    <p>Selected file: {selectedFiles[0].name}</p>
-  {/if}
+  {#each selectedFiles as file}
+    <p>File Name: {file.name}</p>
+  {/each}
 </main>
 
 <style>
