@@ -1,16 +1,38 @@
 <script lang="ts">
-import '../defaultPallette.css'
+import { fly } from 'svelte/transition';
+import { open } from '@tauri-apps/plugin-dialog'
+import { invoke } from '@tauri-apps/api/core';
+import '../defaultPalette.css';
 
 let settingsOpen: boolean = $state(false);
-let dataPath: string = $state('');
+let displayPath: string = $state('Loading...');
+
+async function initPath() {
+    displayPath = await invoke('get_data_path');
+}
 
 function toggleSettings() {
     settingsOpen = !settingsOpen;
 }
 
-function changeDataPath() {
+async function changeDataPath() {
+    const path = await open({
+        multiple: false,
+        directory: true
+    });
 
+    if (path == null) {
+        // User closed the dialog, no need to update anything
+        console.log("Update dialog closed")
+        return;
+    }
+
+    console.log(`Updating file path to ${path}`)
+    displayPath = path;
+    invoke('update_data_path', {path: path});
 }
+
+initPath();
 </script>
 
 <button onclick={toggleSettings} class="open-button">
@@ -18,7 +40,7 @@ function changeDataPath() {
 </button>
 
 {#if settingsOpen}
-    <aside class="sidebar">
+    <aside class="sidebar" transition:fly={{x: 250, duration: 350}}>
         <div class="settings-header"> 
             <h2>Settings</h2>
             <button onclick={toggleSettings} class="close-button">
@@ -30,7 +52,7 @@ function changeDataPath() {
             <li class="data-folder">
                 <p>Data Path</p>
                 <button onclick={changeDataPath}>
-                    Change Path
+                    {displayPath}
                 </button>
             </li>
         </ul>
@@ -57,10 +79,11 @@ function changeDataPath() {
     top: 0;
     width: 250px;
     height: 100%;
-    background: var(--accent-color);
+    background: var(--secondary-color);
     box-shadow: -2px 0 5px rgba(0,0,0,0.1);
     padding: 1rem;
     padding-top: 0.5rem;
+    border-color: var(--accent-color);
     }
 
     .settings-header {
@@ -93,10 +116,17 @@ function changeDataPath() {
         display: flex;
         padding-left: 0;
         width: fit-content;
+        padding-right: 0.5rem;
     }
 
     li button {
         align-self: center;
         display: flex;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-color: var(--accent-color);
+        scrollbar-width: thin;
     }
+
+    /* TODO - change look of scrollbar to match the app's theme*/
 </style>

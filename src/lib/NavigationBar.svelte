@@ -1,7 +1,7 @@
 <script lang="ts" module>
-import '../defaultPallette.css'
 import { goto } from "$app/navigation"
 import SettingsMenu from "./SettingsMenu.svelte";
+import '../defaultPalette.css'
 
 let activeId: number = $state(0);
 let pages: string[] = ['Home', 'Previous-Flights', 'Live-Flight', 'Calendar']
