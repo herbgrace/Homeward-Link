@@ -13,7 +13,6 @@ struct AppState {
     data_dir: std::sync::Mutex<std::path::PathBuf>,
 }
 
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()

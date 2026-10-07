@@ -1,5 +1,7 @@
 <script lang="ts" module>
+import '../defaultPallette.css'
 import { goto } from "$app/navigation"
+import SettingsMenu from "./SettingsMenu.svelte";
 
 let activeId: number = $state(0);
 let pages: string[] = ['Home', 'Previous-Flights', 'Live-Flight', 'Calendar']
@@ -17,26 +19,46 @@ function handleClick(index: number) {
 }
 </script>
 
-<div class="nav-bar">
-    {#each pages as option, i}
-        <button
-            class:selected={activeId === i}
-            aria-label={option}
-            aria-current={current === option}
-            onclick={() => handleClick(i)}
-        >
-            {option.replaceAll("-", " ")}
-        </button>
-    {/each}
+<div class="header-bar">
+    <div class="nav-bar">
+        {#each pages as option, i}
+            <button
+                class:selected={activeId === i}
+                aria-label={option}
+                aria-current={current === option}
+                onclick={() => handleClick(i)}
+            >
+                {option.replaceAll("-", " ")}
+            </button>
+        {/each}
+    </div>
+
+    <SettingsMenu />
 </div>
 
 <style>
+.header-bar {
+    margin-left: 0.5rem;
+    display: flex;
+    align-items: flex-end;
+}
+
+.nav-bar {
+    display: flex;
+    align-items: flex-start;
+}
+
 button {
-    color:black;
-    background: red;
+    color:var(--button-text);
+    background: var(--button-background);
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+    margin: 0.5rem;
 }
 
 button.selected {
-    background: blue;
+    background: var(--button-active-background);
 }
 </style>
