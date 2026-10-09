@@ -5,5 +5,5 @@ import NavigationBar from '../../lib/NavigationBar.svelte';
 <main class="container">
 <title>Calendar</title>
 <NavigationBar />
-<p>This is the calendar</p>
+<p>This is the Calendar</p>
 </main>
