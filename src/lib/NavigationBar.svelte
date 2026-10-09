@@ -1,36 +1,40 @@
 <script lang="ts">
 import { goto } from "$app/navigation"
+import { page } from "$app/state";
+
 import SettingsMenu from "./SettingsMenu.svelte";
 import '../defaultPalette.css'
 
-let activeId: number = $state(0);
-let pages: string[] = ['Home', 'Previous-Flights', 'Live-Flight', 'Calendar']
-let current: string = $state('')
+let paths: string[] = ['/', '/Previous-Flights', '/Live-Flight', '/Calendar']
+let currentRoute: string = $derived(page.url.pathname)
+let activeId: number = $derived(paths.findIndex(route => {
+    return route.toLowerCase() == currentRoute
+}));
 
 let { settingsRefresh } = $props();
 
 function handleClick(index: number) {
     activeId = index;
-    current = pages[index]
-
-    if (current === "Home") {
-        goto ('/')
-    } else {
-        goto(`/${current.toLowerCase()}`)
-    }
+    let reroute = paths[index].toLowerCase();
+    console.log("Rerouting to: " + reroute)
+    goto(paths[index].toLowerCase())
 }
 </script>
 
 <div class="header-bar">
     <div class="nav-bar">
-        {#each pages as option, i}
+        {#each paths as option, i}
             <button
                 class:selected={activeId === i}
                 aria-label={option}
-                aria-current={current === option}
+                aria-current={currentRoute === option}
                 onclick={() => handleClick(i)}
             >
-                {option.replaceAll("-", " ")}
+            {#if i == 0}
+                Home
+            {:else}
+                {option.replaceAll("-", " ").replaceAll("/", "")}
+            {/if}
             </button>
         {/each}
     </div>

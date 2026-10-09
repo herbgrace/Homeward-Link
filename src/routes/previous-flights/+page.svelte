@@ -1,4 +1,5 @@
 <script lang="ts">
+import { goto } from '$app/navigation';
 import NavigationBar from '../../lib/NavigationBar.svelte';
 import { loadEntries } from './savedFlightUtils';
 
@@ -12,6 +13,18 @@ async function refreshEntries() {
     statusMessage = response.errorMessage;
 }
 
+function clickEntry(entryIndex: number) {
+    if (entryIndex < 0 || entryIndex >= loadedFiles.length) {
+        console.log("Tried to load a flight that was out of bound of the saved array")
+        statusMessage = "Unable to load saved flight"
+        return;
+    }
+    const queryParams = new URLSearchParams ({
+        filePath: loadedFiles[entryIndex]
+    });
+    goto(`/display-flight?${queryParams.toString()}`)
+}
+
 refreshEntries();
 </script>
 
@@ -23,8 +36,15 @@ refreshEntries();
 <p>{statusMessage}</p>
 
 <ul>
-    {#each loadedFiles as log}
-        <li>{log}</li>
+    {#each loadedFiles as path, i}
+        <li>
+            <button 
+            id="button-{i}"
+            onclick={() => clickEntry(i)}
+            >
+                {path}
+            </button>
+        </li>
     {/each}
 </ul>
 </main>
