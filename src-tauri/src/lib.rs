@@ -1,5 +1,6 @@
 mod state_controller;
 mod config_controller;
+mod file_controller;
 
 use core::error;
 use tauri::{Manager};
@@ -13,7 +14,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             state_controller::update_data_path,
-            state_controller::get_data_path
+            state_controller::get_data_path,
+            file_controller::get_all_saved_flights
             ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

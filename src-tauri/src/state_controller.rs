@@ -22,7 +22,7 @@ impl From<config_controller::AppConfig> for AppState {
 
 // Gets the data path that's currently being stored in the program's state
 #[tauri::command]
-pub async fn get_data_path(state: tauri::State<'_, AppState>) -> Result<PathBuf, String> {
+pub fn get_data_path(state: tauri::State<'_, AppState>) -> Result<PathBuf, String> {
     Ok(state.data_dir.lock().unwrap().clone())
 }
 

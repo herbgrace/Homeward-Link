@@ -1,4 +1,4 @@
-<script lang="ts" module>
+<script lang="ts">
 import { goto } from "$app/navigation"
 import SettingsMenu from "./SettingsMenu.svelte";
 import '../defaultPalette.css'
@@ -6,6 +6,8 @@ import '../defaultPalette.css'
 let activeId: number = $state(0);
 let pages: string[] = ['Home', 'Previous-Flights', 'Live-Flight', 'Calendar']
 let current: string = $state('')
+
+let { settingsRefresh } = $props();
 
 function handleClick(index: number) {
     activeId = index;
@@ -33,7 +35,7 @@ function handleClick(index: number) {
         {/each}
     </div>
 
-    <SettingsMenu />
+    <SettingsMenu displayedEntriesRefresh={settingsRefresh}/>
 </div>
 
 <style>

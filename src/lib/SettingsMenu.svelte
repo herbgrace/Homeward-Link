@@ -2,10 +2,13 @@
 import { fly } from 'svelte/transition';
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core';
+import { page } from '$app/state';
 import '../defaultPalette.css';
 
 let settingsOpen: boolean = $state(false);
 let displayPath: string = $state('Loading...');
+
+let { displayedEntriesRefresh } = $props();
 
 async function initPath() {
     displayPath = await invoke('get_data_path');
@@ -27,9 +30,15 @@ async function changeDataPath() {
         return;
     }
 
-    console.log(`Updating file path to ${path}`)
+    // console.log(`Updating file path to ${path}`)
     displayPath = path;
     invoke('update_data_path', {path: path});
+    // console.log(page.url.pathname)
+    if (page.url.pathname == '/previous-flights') {
+        // Show the logs from the new folder path
+        // console.log("Attempting to refresh entries")
+        displayedEntriesRefresh();
+    }
 }
 
 initPath();
