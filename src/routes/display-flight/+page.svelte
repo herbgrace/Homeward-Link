@@ -1,8 +1,10 @@
 <script lang="ts">
 import { page } from "$app/state";
 import { goto } from "$app/navigation";
+import { invoke } from "@tauri-apps/api/core";
 
 let filePath = $derived(page.url.searchParams.get('filePath'));
+let fileContents = $derived(invoke<string[][]>('load_flight_data', {fileName: filePath}))
 
 </script>
 
@@ -17,8 +19,15 @@ let filePath = $derived(page.url.searchParams.get('filePath'));
 
     <h3>{filePath}</h3>
 </div>
-<p>You are no longer trapped here...</p>
-<p>But I display the data here</p>
+<div class="flight-content">
+    {#await fileContents}
+        <p>Loading file contents...</p>
+    {:then data} 
+        {#each data as line}
+            <p>{line}</p>
+        {/each}
+    {/await}
+</div>
 </main>
 
 <style>

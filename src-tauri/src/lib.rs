@@ -15,7 +15,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             state_controller::update_data_path,
             state_controller::get_data_path,
-            file_controller::get_all_saved_flights
+            file_controller::get_all_saved_flights,
+            file_controller::load_flight_data
             ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

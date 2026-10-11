@@ -31,8 +31,6 @@ refreshEntries();
 <main class="container">
 <title>Previous Flights</title>
 <NavigationBar settingsRefresh={refreshEntries}/> 
-<p>This is the Previous Flights</p>
-
 <p>{statusMessage}</p>
 
 <ul>

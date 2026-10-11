@@ -1,9 +1,10 @@
 use crate::state_controller;
 
-use std::fs;
+use std::{fs};
 
 #[tauri::command]
 pub async fn get_all_saved_flights(state: tauri::State<'_, state_controller::AppState>) -> Result<Vec<String>, String> {
+    let supported_extensions = ["csv", "telem", "eeprom"];
     // Get file path from app state
     let directory_path = state_controller::get_data_path(state)?;
     if !directory_path.is_dir() {
@@ -17,13 +18,32 @@ pub async fn get_all_saved_flights(state: tauri::State<'_, state_controller::App
     for entry in entries {
         let entry = entry.map_err(|err| err.to_string())?;
         let file_path = entry.path();
-        if file_path.is_file() {
+        let extension = file_path.extension().unwrap().to_str().unwrap();
+        if file_path.is_file() && supported_extensions.contains(&extension) {
             if let Some(s) = file_path.to_str() {
                 files.push(s.to_string());
             }
         }
     }
     return Ok(files);
+}
+
+// Temp function to load all data from a csv file
+// TODO - read file in "blocks" and pass to front-end in sections
+#[tauri::command]
+pub async fn load_flight_data(file_name: String) -> Result<Vec<Vec<String>>, String> {
+    // println!("Attempting to load flight data from path {}", file_name);
+    let reader = csv::Reader::from_path(file_name).map_err(|e| e.to_string());
+    let mut records = Vec::new();
+
+    for result in reader?.records() {
+        let record = result.unwrap();
+        let row: Vec<String> = record.iter().map(|field| field.to_string()).collect();
+        records.push(row);
+    }
+
+    // println!("{:?}", records);
+    Ok(records)
 }
 
 // TODO - get data from a single csv file
