@@ -9,13 +9,16 @@ use core::error;
 #[derive(Debug)]
 pub struct AppState {
     data_dir: Mutex<std::path::PathBuf>,
+    current_block: Mutex<u16>
 }
 
 // AppConfig to AppState
+// Only used when booting the program & loading config file into state
 impl From<config_controller::AppConfig> for AppState {
     fn from(config: config_controller::AppConfig) -> Self {
         AppState { 
-            data_dir: Mutex::new(config.data_path)
+            data_dir: Mutex::new(config.data_path),
+            current_block: Mutex::new(0)
         }
     }
 }
@@ -58,4 +61,17 @@ pub fn update_data_path (
         data_path: new_path.clone(),
     };
     config_controller::save_config(config, app).map_err(|e| e.to_string())
+}
+
+pub fn get_current_block(state: &tauri::State<'_, AppState>) -> Result<u16, String>{
+    Ok(*state.current_block.lock().unwrap())
+}
+
+pub fn reset_current_block(state: &tauri::State<'_, AppState>) -> Result<(), String>{
+    Ok(*state.current_block.lock().unwrap() = 0)
+}
+
+pub fn increment_current_block(state: &tauri::State<'_, AppState>) -> Result<(), String> {
+    get_current_block(state)
+        .and_then(|current| Ok(*state.current_block.lock().unwrap() = current + 1))
 }

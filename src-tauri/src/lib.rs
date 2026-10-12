@@ -16,7 +16,8 @@ pub fn run() {
             state_controller::update_data_path,
             state_controller::get_data_path,
             file_controller::get_all_saved_flights,
-            file_controller::load_flight_data
+            file_controller::load_all_flight_data,
+            file_controller::load_flight_block
             ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

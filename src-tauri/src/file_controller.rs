@@ -1,10 +1,18 @@
+use csv::StringRecord;
+
 use crate::state_controller;
 
 use std::{fs};
 
+const BLOCK_SIZE: u16 = 600; // At most 10 entries/sec, so 60 seconds per refresh
+
 #[tauri::command]
 pub async fn get_all_saved_flights(state: tauri::State<'_, state_controller::AppState>) -> Result<Vec<String>, String> {
     let supported_extensions = ["csv", "telem", "eeprom"];
+
+    // Reset the current block since user isn't looking at a specific flight
+    state_controller::reset_current_block(&state)?;
+
     // Get file path from app state
     let directory_path = state_controller::get_data_path(state)?;
     if !directory_path.is_dir() {
@@ -18,23 +26,33 @@ pub async fn get_all_saved_flights(state: tauri::State<'_, state_controller::App
     for entry in entries {
         let entry = entry.map_err(|err| err.to_string())?;
         let file_path = entry.path();
-        let extension = file_path.extension().unwrap().to_str().unwrap();
-        if file_path.is_file() && supported_extensions.contains(&extension) {
+        let mut extension: &str = ""; // Assume it's a folder by default
+
+        // If the extension exists (And the file name isn't empty), extract the extension
+        if let Some(e) = file_path.extension() {
+            extension = e.to_str().unwrap();
+        }
+
+        // Only return the file if the extension is supported
+        if supported_extensions.contains(&extension) {
             if let Some(s) = file_path.to_str() {
                 files.push(s.to_string());
             }
         }
+        
     }
     return Ok(files);
 }
 
-// Temp function to load all data from a csv file
-// TODO - read file in "blocks" and pass to front-end in sections
+// Read all the data in a given CSV file
+// Unusued for now, but could be useful in the future
 #[tauri::command]
-pub async fn load_flight_data(file_name: String) -> Result<Vec<Vec<String>>, String> {
-    // println!("Attempting to load flight data from path {}", file_name);
-    let reader = csv::Reader::from_path(file_name).map_err(|e| e.to_string());
-    let mut records = Vec::new();
+pub async fn load_all_flight_data(file_path: String) -> Result<Vec<Vec<String>>, String> {
+    let reader = csv::ReaderBuilder::new()
+        .has_headers(false) // Allows inclusion of headers in result without additional logic
+        .from_path(file_path)
+        .map_err(|e| e.to_string());
+    let mut records: Vec<Vec<String>> = Vec::new();
 
     for result in reader?.records() {
         let record = result.unwrap();
@@ -42,14 +60,44 @@ pub async fn load_flight_data(file_name: String) -> Result<Vec<Vec<String>>, Str
         records.push(row);
     }
 
-    // println!("{:?}", records);
     Ok(records)
 }
 
-// TODO - get data from a single csv file
-// Load in "blocks" of ~1000 lines(?)
-// Front-end shouldn't keep track of which block, but how to continuously send blocks to front-end?
-// #[tauri::command]
-// async fn get_saved_flight_block() {
-    
-// }
+// u16 allows for max flight lengths of ~76 days, which should be plenty
+// u8 allows for max lengths of ~7 hours, which could theoretically cause problems
+#[tauri::command]
+pub async fn load_flight_block(state: tauri::State<'_, state_controller::AppState>, file_path: String) -> Result<Vec<Vec<String>>, String> {
+    let mut reader = csv::ReaderBuilder::new()
+        .from_path(file_path)
+        .map_err(|e| e.to_string())?;
+
+    let block = state_controller::get_current_block(&state)?;
+    let skipped_lines: u32 = u32::from(block) * u32::from(BLOCK_SIZE);
+
+    let mut records: Vec<Vec<String>> = Vec::new();
+    let mut line: StringRecord = StringRecord::new();
+
+    // Always add headers as the first entry
+    let headers_record = reader.headers().map_err(|e| e.to_string())?;
+    let headers: Vec<String> = headers_record.iter().map(|field| field.to_string()).collect();
+    records.push(headers);
+
+    // Skip to the block that we care about
+    for _ in 0..skipped_lines {
+        if !reader.read_record(&mut line).map_err(|e| e.to_string())? {
+            return Ok(records);
+        }
+    }
+
+    // Load the entire block
+    for _ in 0..BLOCK_SIZE {
+        if reader.read_record(&mut line).map_err(|e| e.to_string())? {
+            let row: Vec<String> = line.iter().map(|field| field.to_string()).collect();
+            records.push(row);
+        }
+    }
+
+    // Increment the state for future calls, then return loaded lines
+    state_controller::increment_current_block(&state)?;
+    Ok(records)
+}
