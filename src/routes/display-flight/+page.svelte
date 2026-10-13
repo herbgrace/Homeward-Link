@@ -5,15 +5,54 @@ import { invoke } from "@tauri-apps/api/core";
 
 import RocketRenderer from "./RocketRenderer.svelte";
 
+const COLUMN_COUNT = 2;
+const LINES_UNTIL_REFRESH = 10;
+
 let filePath = $derived(page.url.searchParams.get('filePath'));
 let fileName = $derived(filePath?.split("\\").at(-1));
-let loadedBlock: string[][] = $state([])
 
-async function load_new_block() {
-    loadedBlock = await invoke<string[][]>('load_flight_block', {filePath: filePath})
+let firstBlock: string[][] = $state([]);
+let secondBlock: string[][] = $state([]);
+let usingFirst: boolean = $state(false); 
+let headers: string[] = $state([]);
+
+let reachedEnd: boolean = $state(false);
+let displayedLine = $state(0)
+
+function show_next_data_point() {
+    let block_size = (usingFirst ? firstBlock.length : secondBlock.length) - 1;
+    if (displayedLine == block_size) {
+        show_new_block()
+        return;
+    } else if (displayedLine == block_size - LINES_UNTIL_REFRESH) {
+        load_new_block();
+    } 
+    displayedLine++;
 }
 
-load_new_block();
+function show_new_block() {
+    usingFirst = !usingFirst;
+    displayedLine = 0;
+}
+
+async function load_new_block() {
+    // Block will always have headers in the 0th index,
+    // The rest of the data will occupy the rest of the space
+    let loadedBlock = await invoke<string[][]>('load_flight_block', {filePath: filePath});
+    reachedEnd = loadedBlock.length == 1;
+    headers = loadedBlock[0];
+    // A bit counter-intuitive, but we want to avoid updating the data we're currently displaying
+    if (usingFirst) {
+        secondBlock = loadedBlock.slice(1);
+    } else {
+        firstBlock = loadedBlock.slice(1);
+    }
+}
+
+async function initial_setup() {
+    await load_new_block();
+    show_new_block();
+}
 
 // Front end stores two different blocks at a time
 // Seamlessly transitions from 1 -> 2 when 1 ends
@@ -38,14 +77,36 @@ load_new_block();
         >
             Return
         </button>
+        <button onclick={show_next_data_point}>TEMP: show next data point</button>
         <h3>{fileName}</h3>
+        <p>TEMP: You have reached the end: {reachedEnd}</p>
+        <p>TEMP: Current displayed line: {displayedLine}</p>
     </div>
     <div class="flight-data">
-        {#each loadedBlock as line}
-            <p>{line}</p>
-        {/each}
+        {#await initial_setup()}
+            <p>Loading data...</p>
+        {:then d} 
+            <table>
+                <tbody>
+                    {#each Array(Math.ceil(headers.length / COLUMN_COUNT)) as _, row}
+                    <tr>
+                        {#each Array(COLUMN_COUNT) as _, col}
+                        <td>
+                            {headers[(row * COLUMN_COUNT) + col]} <br />
+                            <!-- TODO - add checking to see if there is any data to display -->
+                            {#if usingFirst}
+                                {firstBlock[displayedLine][(row * COLUMN_COUNT) + col]}
+                            {:else}
+                                {secondBlock[displayedLine][(row * COLUMN_COUNT) + col]}
+                            {/if}
+                        </td>
+                        {/each}
+                    </tr>
+                    {/each}
+                </tbody>
+            </table>
+        {/await}
     </div>
-    <button onclick={load_new_block}>Temp Next Block</button>
 </div>
 
 </main>
@@ -93,7 +154,7 @@ h3 {
 }
 
 .main-content {
-    align-self: right;
+    /* align-self: right; */
     max-width: 70%;
     display: flexbox;
     justify-items: center;
