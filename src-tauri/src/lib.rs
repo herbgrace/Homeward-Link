@@ -15,6 +15,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             state_controller::update_data_path,
             state_controller::get_data_path,
+            state_controller::update_block_size,
+            state_controller::get_block_size,
             file_controller::get_all_saved_flights,
             file_controller::load_all_flight_data,
             file_controller::load_flight_block

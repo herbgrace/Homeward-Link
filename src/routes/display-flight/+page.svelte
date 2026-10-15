@@ -6,7 +6,6 @@ import { invoke } from "@tauri-apps/api/core";
 import RocketRenderer from "./RocketRenderer.svelte";
 
 const COLUMN_COUNT = 2;
-const LINES_UNTIL_REFRESH = 10;
 
 let filePath = $derived(page.url.searchParams.get('filePath'));
 let fileName = $derived(filePath?.split("\\").at(-1));
@@ -18,15 +17,19 @@ let headers: string[] = $state([]);
 
 let reachedEnd: boolean = $state(false);
 let displayedLine = $state(0)
+let block_size = $derived((usingFirst ? firstBlock.length : secondBlock.length) - 1)
+let linesUntilRefresh = $derived(Math.floor(block_size * 0.9))
 
-function show_next_data_point() {
-    let block_size = (usingFirst ? firstBlock.length : secondBlock.length) - 1;
+async function show_next_data_point() {
+    // Calculate how long between this data point and the next data point
+    // Then show the next data point after that long    
     if (displayedLine == block_size) {
         show_new_block()
         return;
-    } else if (displayedLine == block_size - LINES_UNTIL_REFRESH) {
+    } else if (displayedLine == block_size - linesUntilRefresh) {
         load_new_block();
     } 
+
     displayedLine++;
 }
 
@@ -35,11 +38,36 @@ function show_new_block() {
     displayedLine = 0;
 }
 
+function determine_waiting_period(firstLine: string[], secondLine: string[]): Number {
+    // TODO - determine what other headers contain valid time data
+    // TODO - find a better way to do this rather than manually listing valid headers
+    const DEFAULT_WAIT = 100;
+    const SECOND_HEADERS = ["unixtime", "relseconds"];
+    const MS_HEADERS = ["relms", "currenttimemillis", "unixms"]
+
+    let usingSeconds: boolean = false;
+
+    let timeIndex = headers.findIndex((head) => {
+        if (SECOND_HEADERS.includes(head.toLowerCase())) {
+            usingSeconds = true;
+            return true;
+        } else {
+            return MS_HEADERS.includes(head.toLowerCase());
+        }
+    })
+
+    if (timeIndex == -1) {
+        return DEFAULT_WAIT;
+    }
+
+    let difference = Number(secondLine[timeIndex]) - Number(firstLine[timeIndex]);
+    return usingSeconds ? difference * 1000 : difference;
+}
+
 async function load_new_block() {
     // Block will always have headers in the 0th index,
     // The rest of the data will occupy the rest of the space
     let loadedBlock = await invoke<string[][]>('load_flight_block', {filePath: filePath});
-    reachedEnd = loadedBlock.length == 1;
     headers = loadedBlock[0];
     // A bit counter-intuitive, but we want to avoid updating the data we're currently displaying
     if (usingFirst) {
