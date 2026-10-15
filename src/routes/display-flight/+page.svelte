@@ -1,94 +1,39 @@
 <script lang="ts">
 import { page } from "$app/state";
 import { goto } from "$app/navigation";
-import { invoke } from "@tauri-apps/api/core";
+import { onMount } from "svelte";
 
+import { init_manager, get_current_line, get_current_line_and_increment, 
+    get_headers, determine_waiting_period, get_next_line_and_increment} from "./blockManager.svelte"
 import RocketRenderer from "./RocketRenderer.svelte";
 
 const COLUMN_COUNT = 2;
 
-let filePath = $derived(page.url.searchParams.get('filePath'));
-let fileName = $derived(filePath?.split("\\").at(-1));
+let filePath: string = $state(page.url.searchParams.get('filePath') || "");
+let fileName: string = $derived(filePath?.split("\\").at(-1) || "");
+let isLoading: boolean = $state(true);
 
-let firstBlock: string[][] = $state([]);
-let secondBlock: string[][] = $state([]);
-let usingFirst: boolean = $state(false); 
 let headers: string[] = $state([]);
+let displayLine: string[] = $state([]);
 
-let reachedEnd: boolean = $state(false);
-let displayedLine = $state(0)
-let block_size = $derived((usingFirst ? firstBlock.length : secondBlock.length) - 1)
-let linesUntilRefresh = $derived(Math.floor(block_size * 0.9))
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function show_next_data_point() {
-    // Calculate how long between this data point and the next data point
-    // Then show the next data point after that long    
-    if (displayedLine == block_size) {
-        show_new_block()
-        return;
-    } else if (displayedLine == block_size - linesUntilRefresh) {
-        load_new_block();
-    } 
+onMount(async () => {
+    await init_manager(filePath);
+    headers = get_headers();
+    displayLine = get_current_line();
+    isLoading = false;
+    console.log("Headers: " + headers)
+    console.log("Line: " + displayLine)
+});
 
-    displayedLine++;
-}
-
-function show_new_block() {
-    usingFirst = !usingFirst;
-    displayedLine = 0;
-}
-
-function determine_waiting_period(firstLine: string[], secondLine: string[]): Number {
-    // TODO - determine what other headers contain valid time data
-    // TODO - find a better way to do this rather than manually listing valid headers
-    const DEFAULT_WAIT = 100;
-    const SECOND_HEADERS = ["unixtime", "relseconds"];
-    const MS_HEADERS = ["relms", "currenttimemillis", "unixms"]
-
-    let usingSeconds: boolean = false;
-
-    let timeIndex = headers.findIndex((head) => {
-        if (SECOND_HEADERS.includes(head.toLowerCase())) {
-            usingSeconds = true;
-            return true;
-        } else {
-            return MS_HEADERS.includes(head.toLowerCase());
-        }
-    })
-
-    if (timeIndex == -1) {
-        return DEFAULT_WAIT;
-    }
-
-    let difference = Number(secondLine[timeIndex]) - Number(firstLine[timeIndex]);
-    return usingSeconds ? difference * 1000 : difference;
-}
-
-async function load_new_block() {
-    // Block will always have headers in the 0th index,
-    // The rest of the data will occupy the rest of the space
-    let loadedBlock = await invoke<string[][]>('load_flight_block', {filePath: filePath});
-    headers = loadedBlock[0];
-    // A bit counter-intuitive, but we want to avoid updating the data we're currently displaying
-    if (usingFirst) {
-        secondBlock = loadedBlock.slice(1);
-    } else {
-        firstBlock = loadedBlock.slice(1);
+async function start_replay() {
+    while (displayLine.length != 0) {
+        await wait(determine_waiting_period())
+        displayLine = get_next_line_and_increment();
     }
 }
 
-async function initial_setup() {
-    await load_new_block();
-    show_new_block();
-}
-
-// Front end stores two different blocks at a time
-// Seamlessly transitions from 1 -> 2 when 1 ends
-// After transitioning from 1 -> 2, requests new block and replaces 1
-// Should Tauri state keep track of which block is needed or should front-end?
-// Front-end keeping track of block number feels like not its responsibility
-// Storing current block in tauri state feels convoluted and confusing, needing resets when going back
-// Tauri commands don't have state, so can't track block in function
 </script>
 
 <main class="container">
@@ -105,15 +50,13 @@ async function initial_setup() {
         >
             Return
         </button>
-        <button onclick={show_next_data_point}>TEMP: show next data point</button>
+        <button onclick={start_replay}>Start the show</button>
         <h3>{fileName}</h3>
-        <p>TEMP: You have reached the end: {reachedEnd}</p>
-        <p>TEMP: Current displayed line: {displayedLine}</p>
     </div>
     <div class="flight-data">
-        {#await initial_setup()}
+        {#if isLoading}
             <p>Loading data...</p>
-        {:then d} 
+        {:else} 
             <table>
                 <tbody>
                     {#each Array(Math.ceil(headers.length / COLUMN_COUNT)) as _, row}
@@ -121,11 +64,12 @@ async function initial_setup() {
                         {#each Array(COLUMN_COUNT) as _, col}
                         <td>
                             {headers[(row * COLUMN_COUNT) + col]} <br />
+
                             <!-- TODO - add checking to see if there is any data to display -->
-                            {#if usingFirst}
-                                {firstBlock[displayedLine][(row * COLUMN_COUNT) + col]}
+                            {#if displayLine.length == 0}
+                                No Data to display
                             {:else}
-                                {secondBlock[displayedLine][(row * COLUMN_COUNT) + col]}
+                                {displayLine[(row * COLUMN_COUNT) + col]}
                             {/if}
                         </td>
                         {/each}
@@ -133,7 +77,7 @@ async function initial_setup() {
                     {/each}
                 </tbody>
             </table>
-        {/await}
+        {/if}
     </div>
 </div>
 

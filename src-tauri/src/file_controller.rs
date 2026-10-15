@@ -98,5 +98,6 @@ pub async fn load_flight_block(state: tauri::State<'_, state_controller::AppStat
 
     // Increment the state for future calls, then return loaded lines
     state_controller::increment_current_block(&state)?;
+    
     Ok(records)
 }
