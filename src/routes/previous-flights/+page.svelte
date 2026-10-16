@@ -1,7 +1,7 @@
 <script lang="ts">
 import { goto } from '$app/navigation';
-import NavigationBar from '../../lib/NavigationBar.svelte';
-import { loadEntries } from './savedFlightUtils';
+import NavigationBar from '$lib/svelte_components/NavigationBar.svelte';
+import { loadEntries } from '$lib/ts_helpers/savedFlightUtils';
 
 let statusMessage: string = $state('Loading Files...');
 let loadedFiles: string[] = $state([]);

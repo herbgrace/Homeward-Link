@@ -1,6 +1,5 @@
 <script lang="ts">
-  import NavigationBar from '../lib/NavigationBar.svelte';
-  import '../defaultPalette.css'
+  import NavigationBar from '$lib/svelte_components/NavigationBar.svelte';
 
 </script>
 

@@ -1,20 +1,31 @@
 <script lang="ts">
 import { page } from "$app/state";
 import { goto } from "$app/navigation";
-import { onMount } from "svelte";
+import { onMount, onDestroy } from "svelte";
 
-import { init_manager, get_current_line, get_current_line_and_increment, 
-    get_headers, determine_waiting_period, get_next_line_and_increment} from "./blockManager.svelte"
-import RocketRenderer from "./RocketRenderer.svelte";
+import {    
+    init_manager, 
+    reset_manager, 
+    get_current_line, 
+    get_headers, 
+    determine_waiting_period, 
+    get_next_line_and_increment
+} from "$lib/ts_helpers/blockManager.svelte"
+import ModelViewer from "$lib/svelte_components/ModelViewer.svelte";
 
 const COLUMN_COUNT = 2;
 
 let filePath: string = $state(page.url.searchParams.get('filePath') || "");
 let fileName: string = $derived(filePath?.split("\\").at(-1) || "");
 let isLoading: boolean = $state(true);
+let isPlaying: boolean = $state(false);
 
 let headers: string[] = $state([]);
 let displayLine: string[] = $state([]);
+
+let rocketPitch = $state(0);
+let rocketYaw = $state(0);
+let rocketRoll = $state(0);
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -27,11 +38,24 @@ onMount(async () => {
     console.log("Line: " + displayLine)
 });
 
+onDestroy(async () => {
+    isPlaying = false;
+    reset_manager();
+})
+
 async function start_replay() {
-    while (displayLine.length != 0) {
+    if (isPlaying) {
+        return;
+    }
+    isPlaying = true;
+    while (displayLine.length != 0 && isPlaying) {
         await wait(determine_waiting_period())
         displayLine = get_next_line_and_increment();
     }
+}
+
+async function stop_replay() {
+    isPlaying = false;
 }
 
 </script>
@@ -39,7 +63,13 @@ async function start_replay() {
 <main class="container">
 
 <div class="sidebar">
-    <RocketRenderer />
+    <ModelViewer 
+    url="/models/RussianRocket/RocketTweaked.compressed.glb"
+    rotationX={rocketPitch}
+    rotationY={rocketYaw}
+    rotationZ={rocketRoll}
+    scale={1.2}
+    />
 </div>
 
 <div class="main-content">
@@ -50,7 +80,8 @@ async function start_replay() {
         >
             Return
         </button>
-        <button onclick={start_replay}>Start the show</button>
+        <button onclick={start_replay}>Play</button>
+        <button onclick={stop_replay}>Pause</button>
         <h3>{fileName}</h3>
     </div>
     <div class="flight-data">

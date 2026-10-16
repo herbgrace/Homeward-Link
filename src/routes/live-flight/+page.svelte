@@ -1,5 +1,5 @@
 <script>
-import NavigationBar from '../../lib/NavigationBar.svelte';
+import NavigationBar from '$lib/svelte_components/NavigationBar.svelte';
 </script>
 
 <main class="container">

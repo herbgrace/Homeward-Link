@@ -3,7 +3,6 @@ import { fly } from 'svelte/transition';
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core';
 import { page } from '$app/state';
-import '../defaultPalette.css';
 
 const MIN_BLOCK_SIZE = 5;
 const MAX_BLOCK_SIZE = 65535;

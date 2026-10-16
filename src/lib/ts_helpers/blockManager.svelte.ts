@@ -30,6 +30,12 @@ export async function init_manager(path: string) {
     usingFirst = !usingFirst;
 }
 
+export async function reset_manager() {
+    filePath = ''
+    usingFirst = false;
+    displayedLineIndex = 0;
+}
+
 export function get_headers(): string[] {
     return headers;
 }
