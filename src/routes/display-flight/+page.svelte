@@ -23,6 +23,7 @@ let isPlaying: boolean = $state(false);
 let headers: string[] = $state([]);
 let displayLine: string[] = $state([]);
 
+let rocketPath = $state("/models/RussianRocket/RocketTweaked.glb");
 let rocketPitch = $state(0);
 let rocketYaw = $state(0);
 let rocketRoll = $state(0);
@@ -34,8 +35,6 @@ onMount(async () => {
     headers = get_headers();
     displayLine = get_current_line();
     isLoading = false;
-    console.log("Headers: " + headers)
-    console.log("Line: " + displayLine)
 });
 
 onDestroy(async () => {
@@ -64,11 +63,11 @@ async function stop_replay() {
 
 <div class="sidebar">
     <ModelViewer 
-    url="/models/RussianRocket/RocketTweaked.compressed.glb"
+    // url={rocketPath}
     rotationX={rocketPitch}
     rotationY={rocketYaw}
     rotationZ={rocketRoll}
-    scale={1.2}
+    scale={0.25}
     />
 </div>
 
@@ -154,6 +153,10 @@ h3 {
     padding: 1rem;
     padding-top: 0.5rem;
     border-color: var(--accent-color);
+    box-sizing: border-box;       /* Keeps padding inside the 100% height/width */
+    display: flex;                /* Turns it into a flex container */
+    flex-direction: column;       /* Stacks children vertically */
+    gap: 1rem;                    /* Adds spacing between sidebar items */
 }
 
 .main-content {

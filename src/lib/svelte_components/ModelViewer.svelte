@@ -3,7 +3,6 @@
   import * as THREE from 'three';
   import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-  // Define TypeScript interface for component props
   interface Props {
     url?: string;
     rotationX?: number;
@@ -13,7 +12,7 @@
   }
 
   let { 
-    url = '/models/rocket.glb', 
+    url = '/models/LowPoly/Rocket.glb',
     rotationX = 0, 
     rotationY = 0, 
     rotationZ = 0,
@@ -28,23 +27,21 @@
   let animationFrameId: number;
 
   onMount(() => {
-    // 1. Initialize Scene, Camera, & Renderer
+    const width = container.clientWidth || 300;
+    const height = container.clientHeight || 350;
+
+    // Initialize Scene, Camera, & Renderer
     scene = new THREE.Scene();
 
-    camera = new THREE.PerspectiveCamera(
-      45,
-      container.clientWidth / container.clientHeight,
-      0.1,
-      1000
-    );
+    camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
     camera.position.set(0, 2, 6);
 
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    // 2. Add Lighting
+    // Add Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambientLight);
 
@@ -56,7 +53,7 @@
     backLight.position.set(-5, -5, -5);
     scene.add(backLight);
 
-    // 3. Load GLB Model
+    // Load GLB Model
     const loader = new GLTFLoader();
     loader.load(
       url,
@@ -72,29 +69,35 @@
       }
     );
 
-    // 4. Render Loop
+    // Render Loop
     function animate() {
       animationFrameId = requestAnimationFrame(animate);
       renderer.render(scene, camera);
     }
     animate();
 
-    // 5. Handle Window Resize
-    function handleResize() {
-      if (!container) return;
-      camera.aspect = container.clientWidth / container.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
-    }
-    window.addEventListener('resize', handleResize);
+    // Use ResizeObserver for precise container tracking
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const w = entry.contentRect.width;
+        const h = entry.contentRect.height;
+        if (w > 0 && h > 0) {
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h);
+        }
+      }
+    });
+    resizeObserver.observe(container);
 
     // Cleanup on destroy
     return () => {
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       cancelAnimationFrame(animationFrameId);
-      if (renderer && renderer.domElement) {
+      if (renderer && renderer.domElement && container) {
         container.removeChild(renderer.domElement);
       }
+      renderer?.dispose();
     };
   });
 
@@ -109,7 +112,6 @@
 
   // React to prop changes from the parent component
   $effect(() => {
-    // Track dependencies explicitly for Svelte 5 effect rune
     rotationX;
     rotationY;
     rotationZ;
@@ -117,4 +119,5 @@
   });
 </script>
 
-<div bind:this={container} class="w-full h-full min-h-[350px] overflow-hidden"></div>
+<!-- Give the container an explicit height class so it never collapses to 0 -->
+<div bind:this={container} class="w-full h-[350px] overflow-hidden"></div>
