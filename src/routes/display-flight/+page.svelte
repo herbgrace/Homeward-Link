@@ -8,6 +8,7 @@ import {
     reset_manager, 
     get_current_line, 
     get_headers, 
+    get_rotation,
     determine_waiting_period, 
     get_next_line_and_increment
 } from "$lib/ts_helpers/blockManager.svelte"
@@ -24,9 +25,9 @@ let headers: string[] = $state([]);
 let displayLine: string[] = $state([]);
 
 let rocketPath = $state("/models/RussianRocket/RocketTweaked.glb");
+let rocketRoll = $state(0);
 let rocketPitch = $state(0);
 let rocketYaw = $state(0);
-let rocketRoll = $state(0);
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -34,6 +35,7 @@ onMount(async () => {
     await init_manager(filePath);
     headers = get_headers();
     displayLine = get_current_line();
+    moveModel();
     isLoading = false;
 });
 
@@ -48,6 +50,7 @@ async function start_replay() {
     }
     isPlaying = true;
     while (displayLine.length != 0 && isPlaying) {
+        moveModel();
         await wait(determine_waiting_period())
         displayLine = get_next_line_and_increment();
     }
@@ -57,16 +60,24 @@ async function stop_replay() {
     isPlaying = false;
 }
 
+function moveModel() {
+    let rotation: number[] = get_rotation();
+    console.log(rotation);
+    rocketRoll = rotation[0];
+    rocketPitch = rotation[1];
+    rocketYaw = rotation[2];
+}
+
 </script>
 
 <main class="container">
 
 <div class="sidebar">
     <ModelViewer 
-    // url={rocketPath}
-    rotationX={rocketPitch}
-    rotationY={rocketYaw}
-    rotationZ={rocketRoll}
+    url={rocketPath}
+    rotationX={rocketRoll}
+    rotationY={rocketPitch}
+    rotationZ={rocketYaw}
     scale={0.25}
     />
 </div>

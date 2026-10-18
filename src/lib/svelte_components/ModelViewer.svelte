@@ -12,7 +12,7 @@
   }
 
   let { 
-    url = '/models/LowPoly/Rocket.glb',
+    url = '/models/LowPoly/Rocket.glb', //Default to LowPoly Rocket
     rotationX = 0, 
     rotationY = 0, 
     rotationZ = 0,
@@ -112,6 +112,7 @@
 
   // React to prop changes from the parent component
   $effect(() => {
+    console.log("Updating the model's rotation")
     rotationX;
     rotationY;
     rotationZ;
