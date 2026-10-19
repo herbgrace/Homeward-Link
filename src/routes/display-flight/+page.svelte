@@ -1,33 +1,85 @@
 <script lang="ts">
 import { page } from "$app/state";
 import { goto } from "$app/navigation";
-import { invoke } from "@tauri-apps/api/core";
+import { onMount, onDestroy } from "svelte";
 
-import RocketRenderer from "./RocketRenderer.svelte";
+import {    
+    init_manager, 
+    reset_manager, 
+    get_current_line, 
+    get_headers, 
+    get_rotation,
+    determine_waiting_period, 
+    get_next_line_and_increment
+} from "$lib/ts_helpers/blockManager.svelte"
+import ModelViewer from "$lib/svelte_components/ModelViewer.svelte";
 
-let filePath = $derived(page.url.searchParams.get('filePath'));
-let fileName = $derived(filePath?.split("\\").at(-1));
-let loadedBlock: string[][] = $state([])
+const COLUMN_COUNT = 2;
 
-async function load_new_block() {
-    loadedBlock = await invoke<string[][]>('load_flight_block', {filePath: filePath})
+let filePath: string = $state(page.url.searchParams.get('filePath') || "");
+let fileName: string = $derived(filePath?.split("\\").at(-1) || "");
+let isLoading: boolean = $state(true);
+let isPlaying: boolean = $state(false);
+
+let headers: string[] = $state([]);
+let displayLine: string[] = $state([]);
+
+let rocketPath = $state("/models/RussianRocket/RocketTweaked.glb");
+let rocketRoll = $state(0);
+let rocketPitch = $state(0);
+let rocketYaw = $state(0);
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+onMount(async () => {
+    await init_manager(filePath);
+    headers = get_headers();
+    displayLine = get_current_line();
+    moveModel();
+    isLoading = false;
+});
+
+onDestroy(async () => {
+    isPlaying = false;
+    reset_manager();
+})
+
+async function start_replay() {
+    if (isPlaying) {
+        return;
+    }
+    isPlaying = true;
+    while (displayLine.length != 0 && isPlaying) {
+        moveModel();
+        await wait(determine_waiting_period())
+        displayLine = get_next_line_and_increment();
+    }
 }
 
-load_new_block();
+async function stop_replay() {
+    isPlaying = false;
+}
 
-// Front end stores two different blocks at a time
-// Seamlessly transitions from 1 -> 2 when 1 ends
-// After transitioning from 1 -> 2, requests new block and replaces 1
-// Should Tauri state keep track of which block is needed or should front-end?
-// Front-end keeping track of block number feels like not its responsibility
-// Storing current block in tauri state feels convoluted and confusing, needing resets when going back
-// Tauri commands don't have state, so can't track block in function
+function moveModel() {
+    let rotation: number[] = get_rotation();
+    console.log(rotation);
+    rocketRoll = rotation[0];
+    rocketPitch = rotation[1];
+    rocketYaw = rotation[2];
+}
+
 </script>
 
 <main class="container">
 
 <div class="sidebar">
-    <RocketRenderer />
+    <ModelViewer 
+    url={rocketPath}
+    rotationX={rocketRoll}
+    rotationY={rocketPitch}
+    rotationZ={rocketYaw}
+    scale={0.25}
+    />
 </div>
 
 <div class="main-content">
@@ -38,14 +90,36 @@ load_new_block();
         >
             Return
         </button>
+        <button onclick={start_replay}>Play</button>
+        <button onclick={stop_replay}>Pause</button>
         <h3>{fileName}</h3>
     </div>
     <div class="flight-data">
-        {#each loadedBlock as line}
-            <p>{line}</p>
-        {/each}
+        {#if isLoading}
+            <p>Loading data...</p>
+        {:else} 
+            <table>
+                <tbody>
+                    {#each Array(Math.ceil(headers.length / COLUMN_COUNT)) as _, row}
+                    <tr>
+                        {#each Array(COLUMN_COUNT) as _, col}
+                        <td>
+                            {headers[(row * COLUMN_COUNT) + col]} <br />
+
+                            <!-- TODO - add checking to see if there is any data to display -->
+                            {#if displayLine.length == 0}
+                                No Data to display
+                            {:else}
+                                {displayLine[(row * COLUMN_COUNT) + col]}
+                            {/if}
+                        </td>
+                        {/each}
+                    </tr>
+                    {/each}
+                </tbody>
+            </table>
+        {/if}
     </div>
-    <button onclick={load_new_block}>Temp Next Block</button>
 </div>
 
 </main>
@@ -90,10 +164,14 @@ h3 {
     padding: 1rem;
     padding-top: 0.5rem;
     border-color: var(--accent-color);
+    box-sizing: border-box;       /* Keeps padding inside the 100% height/width */
+    display: flex;                /* Turns it into a flex container */
+    flex-direction: column;       /* Stacks children vertically */
+    gap: 1rem;                    /* Adds spacing between sidebar items */
 }
 
 .main-content {
-    align-self: right;
+    /* align-self: right; */
     max-width: 70%;
     display: flexbox;
     justify-items: center;

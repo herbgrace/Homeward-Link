@@ -3,15 +3,19 @@ import { fly } from 'svelte/transition';
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core';
 import { page } from '$app/state';
-import '../defaultPalette.css';
+
+const MIN_BLOCK_SIZE = 5;
+const MAX_BLOCK_SIZE = 65535;
 
 let settingsOpen: boolean = $state(false);
 let displayPath: string = $state('Loading...');
+let blockSize: string = $state('Loading..');
 
 let { displayedEntriesRefresh } = $props();
 
-async function initPath() {
+async function initSettings() {
     displayPath = await invoke('get_data_path');
+    blockSize = await invoke('get_block_size')
 }
 
 function toggleSettings() {
@@ -41,7 +45,23 @@ async function changeDataPath() {
     }
 }
 
-initPath();
+async function changeBlockSize(event: FocusEvent) {
+    let target = event.currentTarget
+    if (target instanceof(HTMLInputElement)) {
+        blockSize = target.value;
+        let blockNumber = parseInt(blockSize);
+
+        if ((blockNumber < MIN_BLOCK_SIZE) || (blockNumber > MAX_BLOCK_SIZE)) {
+            console.log("New block size outside of accepted bounds");
+            return;
+        }
+        // console.log(`New block size: ${blockSize}`)
+        invoke('update_block_size', {newSize: blockNumber});
+        // console.log("Should have updated the block size")
+    } 
+}
+
+initSettings();
 </script>
 
 <button onclick={toggleSettings} class="open-button">
@@ -63,6 +83,16 @@ initPath();
                 <button onclick={changeDataPath}>
                     {displayPath}
                 </button>
+            </li>
+            <li>
+                <div class="line-amount">
+                    Loaded Line Amount
+                    <span class="block-description">
+                        This is a description of what this setting does
+                    </span>
+                    <input type="text" value={blockSize} onblur={changeBlockSize}>
+                    <!-- TODO - show error message if new size is outside of bounds -->
+                </div>
             </li>
         </ul>
     </aside>
@@ -137,5 +167,33 @@ initPath();
         scrollbar-width: thin;
     }
 
+    .line-amount {
+        position: relative;
+        display: inline-block;
+        text-decoration: underline;
+        text-decoration-style: dotted;
+    }
+
+    .block-description {
+        visibility: hidden;
+        position: absolute;
+        bottom: 120%; /* Position it right above the button */
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #333;
+        color: #fff;
+        padding: 6px 10px;
+        border-radius: 4px;
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out; /* Smooth fade-in */
+    }
+
+    .line-amount:hover .block-description {
+        display: inline;
+        visibility: visible;
+    }
+
+    /* TODO - make the tooltip for hovering over number of loaded lines appear */
     /* TODO - change look of scrollbar to match the app's theme*/
 </style>

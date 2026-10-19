@@ -1,11 +1,25 @@
 use serde::{Deserialize, Serialize};
-use tauri::Manager;
+use tauri::{Manager, State};
 use std::{fs};
+
+use crate::state_controller;
 // AppConfig only for saving/loading the json file - use for anything not modifying values
 // Public values since it's used as an object for parameters/returning
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppConfig {
     pub data_path: std::path::PathBuf,
+    pub loaded_block_size: u16
+}
+
+// AppState to AppConfig
+// Used when saving the app's state to the config file
+impl<'a> From<State<'_, state_controller::AppState>> for AppConfig {
+    fn from(state: State<'_, state_controller::AppState>) -> Self {
+        AppConfig { 
+            data_path: state.data_dir.lock().unwrap().clone(),
+            loaded_block_size: state.block_size.lock().unwrap().clone()
+        }
+    }
 }
 
 // Reads the user's saved preferences on startup from the saved config file and stores them locally
@@ -20,6 +34,7 @@ pub fn load_config(app: &mut tauri::App) -> Result<AppConfig, Box<dyn std::error
     // Set up a default config in case it's the first time running
     let mut loaded_config = AppConfig {
         data_path: default_data_path.clone(),
+        loaded_block_size: 600
         // Add other config options here
     };
 
@@ -46,7 +61,9 @@ pub fn load_config(app: &mut tauri::App) -> Result<AppConfig, Box<dyn std::error
     Ok(loaded_config.clone())
 }
 
-pub fn save_config(config: AppConfig, app: tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+pub fn save_config_from_state(app: tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let state = app.state::<state_controller::AppState>();
+    let config = AppConfig::from(state);
     // Get the config file location
     let config_path = app
         .path()

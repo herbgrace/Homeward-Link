@@ -4,8 +4,6 @@ use crate::state_controller;
 
 use std::{fs};
 
-const BLOCK_SIZE: u16 = 600; // At most 10 entries/sec, so 60 seconds per refresh
-
 #[tauri::command]
 pub async fn get_all_saved_flights(state: tauri::State<'_, state_controller::AppState>) -> Result<Vec<String>, String> {
     let supported_extensions = ["csv", "telem", "eeprom"];
@@ -72,7 +70,8 @@ pub async fn load_flight_block(state: tauri::State<'_, state_controller::AppStat
         .map_err(|e| e.to_string())?;
 
     let block = state_controller::get_current_block(&state)?;
-    let skipped_lines: u32 = u32::from(block) * u32::from(BLOCK_SIZE);
+    let block_size: u16 = state_controller::get_block_size(state.clone())?;
+    let skipped_lines: u32 = u32::from(block) * u32::from(block_size);
 
     let mut records: Vec<Vec<String>> = Vec::new();
     let mut line: StringRecord = StringRecord::new();
@@ -90,7 +89,7 @@ pub async fn load_flight_block(state: tauri::State<'_, state_controller::AppStat
     }
 
     // Load the entire block
-    for _ in 0..BLOCK_SIZE {
+    for _ in 0..block_size {
         if reader.read_record(&mut line).map_err(|e| e.to_string())? {
             let row: Vec<String> = line.iter().map(|field| field.to_string()).collect();
             records.push(row);
@@ -99,5 +98,6 @@ pub async fn load_flight_block(state: tauri::State<'_, state_controller::AppStat
 
     // Increment the state for future calls, then return loaded lines
     state_controller::increment_current_block(&state)?;
+    
     Ok(records)
 }
