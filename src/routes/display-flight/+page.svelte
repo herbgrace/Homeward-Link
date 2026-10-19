@@ -70,7 +70,7 @@ function moveModel() {
 
 </script>
 
-<main class="container">
+<div class="content-container">
 
 <div class="sidebar">
     <ModelViewer 
@@ -82,7 +82,7 @@ function moveModel() {
     />
 </div>
 
-<div class="main-content">
+<main class="main-content">
     <div class="header-bar">
         <button 
         class="return-button"
@@ -120,68 +120,84 @@ function moveModel() {
             </table>
         {/if}
     </div>
-</div>
-
 </main>
 
+</div>
+
 <style>
-.container {
-    justify-content: flex-end;
-    /* max-width: 75%; */
-    align-items: flex-end;
+/* Global rules are usually best in an external global.css, 
+   but kept here to ensure height fills the screen */
+:global(html), :global(body) {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+.content-container {
+    display: grid;
+    /* Sidebar takes 250px exactly, main content takes 100% of remaining space */
+    grid-template-columns: 250px 1fr;
+    min-height: 100vh;
+    width: 100%;
+}
+
+.sidebar {
+    background: var(--secondary-color, #f4f4f4);
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1); /* Flipped shadow direction to the right */
+    padding: 1rem;
+    padding-top: 0.5rem;
+    border-right: 1px solid var(--accent-color, #ccc);
+    box-sizing: border-box;       
+    display: flex;                
+    flex-direction: column;       
+    gap: 1rem;                    
+}
+
+.main-content {
+    padding: 2rem;
+    box-sizing: border-box;
+    
     display: flex;
-    flex-direction: row;
-    margin-right: 0;
+    flex-direction: column;   /* Stack the header-bar and flight-data vertically */
+    justify-content: flex-start;  /* Align content vertically */
+    align-items: center;      /* Center content horizontally */
+    gap: 1.5rem;              /* Add clean spacing between header and flight data */
 }
 
 .header-bar {
     display: flex;
     align-items: center;
-    margin-top: auto;
-    /* justify-items: flex-start; */
-}
-
-button {
-    display: flex;
-    width: fit-content;
-    padding-left: auto;
-}
-
-h3 {
-    align-self: center;
-    display: flex;
-    margin-left: 1rem;
-}
-
-.sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 25%;
-    height: 100%;
-    background: var(--secondary-color);
-    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-    padding: 1rem;
-    padding-top: 0.5rem;
-    border-color: var(--accent-color);
-    box-sizing: border-box;       /* Keeps padding inside the 100% height/width */
-    display: flex;                /* Turns it into a flex container */
-    flex-direction: column;       /* Stacks children vertically */
-    gap: 1rem;                    /* Adds spacing between sidebar items */
-}
-
-.main-content {
-    /* align-self: right; */
-    max-width: 70%;
-    display: flexbox;
-    justify-items: center;
-    align-items: center;
+    gap: 0.5rem;              /* Spacing between buttons and text */
+    width: 100%;
+    max-width: 800px;         /* Keeps the table and header aligned nicely */
 }
 
 .flight-data {
-    display: flexbox;
-    max-width: 100%;
-    text-wrap: wrap;
+    width: 100%;
+    max-width: 800px;         /* Limits content stretch on extremely wide monitors */
     box-sizing: border-box;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+td {
+    padding: 12px;
+    border: none;
+}
+
+tr {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+button {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+}
+
+h3 {
+    margin: 0 0 0 1rem;
 }
 </style>

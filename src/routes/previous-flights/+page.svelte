@@ -50,7 +50,7 @@ refreshEntries();
 <style>
     ul {
         display: block;
-        padding-left: 0.25rem;
+        padding-left: 0.75rem;
         padding-right: 0.25rem;
         justify-content: center;
     }

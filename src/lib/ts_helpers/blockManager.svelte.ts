@@ -43,9 +43,9 @@ function find_indices() {
     // TODO - add functionality to let users pick which headers do what instead of hardcoding
     const SECOND_HEADERS = ["unixtime", "relseconds"];
     const MS_HEADERS = ["relms", "currenttimemillis", "unixms"]
-    const ROLL_HEADERS = ["roll"]
-    const PITCH_HEADERS = ["pitch"]
-    const YAW_HEADERS = ["yaw"]
+    const ROLL_HEADERS = ["roll", "x"]
+    const PITCH_HEADERS = ["pitch", "y"]
+    const YAW_HEADERS = ["yaw", "z"]
 
     get_headers().forEach((header, index) => {
         header = header.toLowerCase()
