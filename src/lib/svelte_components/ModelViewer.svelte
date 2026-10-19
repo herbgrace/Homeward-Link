@@ -112,7 +112,7 @@
 
   // React to prop changes from the parent component
   $effect(() => {
-    console.log("Updating the model's rotation")
+    // console.log("Updating the model's rotation")
     rotationX;
     rotationY;
     rotationZ;

@@ -22,7 +22,7 @@ function clickEntry(entryIndex: number) {
     const queryParams = new URLSearchParams ({
         filePath: loadedFiles[entryIndex]
     });
-    goto(`/display-flight?${queryParams.toString()}`)
+    goto(`/display-previous-flight?${queryParams.toString()}`)
 }
 
 refreshEntries();

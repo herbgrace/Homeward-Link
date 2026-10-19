@@ -1,68 +1,48 @@
 <script lang="ts">
-import { page } from "$app/state";
 import { goto } from "$app/navigation";
-import { onMount, onDestroy } from "svelte";
 
-import {    
-    init_manager, 
-    reset_manager, 
-    get_current_line, 
-    get_headers, 
-    get_rotation,
-    determine_waiting_period, 
-    get_next_line_and_increment
+import {
+    get_rotation
 } from "$lib/ts_helpers/blockManager.svelte"
+
 import ModelViewer from "$lib/svelte_components/ModelViewer.svelte";
 
+interface Props {
+    dataUrl?: string,
+    displayLine: string[],
+    headers: string[],
+    isLive: boolean,
+    startReplayMethod: (event: MouseEvent) => void,
+    pauseReplayMethod: (event: MouseEvent) => void,
+}
+
+let {
+    dataUrl = undefined,
+    isLive = false,
+    displayLine,
+    headers,
+    startReplayMethod,
+    pauseReplayMethod
+}: Props = $props()
+
+let fileName = $derived(dataUrl?.split("\\").at(-1))
+
+$effect(() => {
+    displayLine;
+    headers;
+    moveModel();
+})
+
 const COLUMN_COUNT = 2;
-
-let filePath: string = $state(page.url.searchParams.get('filePath') || "");
-let fileName: string = $derived(filePath?.split("\\").at(-1) || "");
-let isLoading: boolean = $state(true);
-let isPlaying: boolean = $state(false);
-
-let headers: string[] = $state([]);
-let displayLine: string[] = $state([]);
 
 let rocketPath = $state("/models/RussianRocket/RocketTweaked.glb");
 let rocketRoll = $state(0);
 let rocketPitch = $state(0);
 let rocketYaw = $state(0);
 
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-onMount(async () => {
-    await init_manager(filePath);
-    headers = get_headers();
-    displayLine = get_current_line();
-    moveModel();
-    isLoading = false;
-});
-
-onDestroy(async () => {
-    isPlaying = false;
-    reset_manager();
-})
-
-async function start_replay() {
-    if (isPlaying) {
-        return;
-    }
-    isPlaying = true;
-    while (displayLine.length != 0 && isPlaying) {
-        moveModel();
-        await wait(determine_waiting_period())
-        displayLine = get_next_line_and_increment();
-    }
-}
-
-async function stop_replay() {
-    isPlaying = false;
-}
-
 function moveModel() {
     let rotation: number[] = get_rotation();
-    console.log(rotation);
+    // console.log(rotation);
     rocketRoll = rotation[0];
     rocketPitch = rotation[1];
     rocketYaw = rotation[2];
@@ -84,19 +64,26 @@ function moveModel() {
 
 <main class="main-content">
     <div class="header-bar">
-        <button 
-        class="return-button"
-        onclick={() => goto("/previous-flights")}
-        >
-            Return
-        </button>
-        <button onclick={start_replay}>Play</button>
-        <button onclick={stop_replay}>Pause</button>
-        <h3>{fileName}</h3>
+        <!-- Live Flights have the header bar for navigation -->
+        {#if !isLive}
+            <button 
+            class="return-button"
+            onclick={() => goto("/previous-flights")}
+            >
+                Return
+            </button>
+            <button onclick={startReplayMethod}>Play</button>
+            <button onclick={pauseReplayMethod}>Pause</button>
+            <h3>{fileName}</h3>
+        {:else}
+            <!-- For now, I'm sure logic of getting connected to a board will be different -->
+            <button onclick={startReplayMethod}>Play</button>
+            <button onclick={pauseReplayMethod}>Pause</button>
+        {/if}
     </div>
     <div class="flight-data">
-        {#if isLoading}
-            <p>Loading data...</p>
+        {#if displayLine.length == 0 || headers.length == 0}
+            <p>Invalid data</p>
         {:else} 
             <table>
                 <tbody>
