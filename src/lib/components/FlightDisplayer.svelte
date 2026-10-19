@@ -3,9 +3,9 @@ import { goto } from "$app/navigation";
 
 import {
     get_rotation
-} from "$lib/ts_helpers/blockManager.svelte"
+} from "$lib/utils/blockManager.svelte"
 
-import ModelViewer from "$lib/svelte_components/ModelViewer.svelte";
+import ModelViewer from "$lib/components/ModelViewer.svelte";
 
 interface Props {
     dataUrl?: string,

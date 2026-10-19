@@ -9,9 +9,9 @@ import {
     get_headers,
     determine_waiting_period, 
     get_next_line_and_increment
-} from "$lib/ts_helpers/blockManager.svelte"
+} from "$lib/utils/blockManager.svelte"
 
-import FlightDisplayer from "$lib/svelte_components/FlightDisplayer.svelte";
+import FlightDisplayer from "$lib/components/FlightDisplayer.svelte";
 
 let filePath: string = $state(page.url.searchParams.get('filePath') || "");
 let isLoading: boolean = $state(true);

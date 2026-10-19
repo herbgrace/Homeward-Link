@@ -1,6 +1,6 @@
 <script lang="ts">
-import NavigationBar from '$lib/svelte_components/NavigationBar.svelte';
-import FlightDisplayer from '$lib/svelte_components/FlightDisplayer.svelte';
+import NavigationBar from '$lib/components/NavigationBar.svelte';
+import FlightDisplayer from '$lib/components/FlightDisplayer.svelte';
 
 let headers: string[] = $state([])
 let line: string[] = $state([]);
