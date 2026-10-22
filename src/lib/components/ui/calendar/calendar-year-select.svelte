@@ -13,9 +13,10 @@
 
 <span
 	class={cn(
-		"relative flex rounded-md border border-input shadow-xs has-focus:border-ring has-focus:ring-[3px] has-focus:ring-ring/50",
+		"relative inline-flex rounded-md border border-input shadow-xs has-focus:border-ring has-focus:ring-[3px] has-focus:ring-ring/50",
 		className
 	)}
+	style="position: relative; display: inline-flex;"
 >
 	<CalendarPrimitive.YearSelect
 		bind:ref
@@ -23,7 +24,11 @@
 		{...restProps}
 	>
 		{#snippet child({ props, yearItems, selectedYearItem })}
-			<select {...props} {value}>
+			<select 
+				{...props} 
+				{value}
+				style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; appearance: none; -webkit-appearance: none;"
+			>
 				{#each yearItems as yearItem (yearItem.value)}
 					<option
 						value={yearItem.value}
@@ -40,7 +45,7 @@
 				aria-hidden="true"
 			>
 				{yearItems.find((item) => item.value === value)?.label || selectedYearItem.label}
-				<ChevronDownIcon class={cn("size-4", className)} />
+				<ChevronDownIcon class="size-4" />
 			</span>
 		{/snippet}
 	</CalendarPrimitive.YearSelect>
