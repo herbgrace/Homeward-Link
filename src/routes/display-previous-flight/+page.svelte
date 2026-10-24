@@ -61,6 +61,7 @@ async function stop_replay() {
             headers={headers}
             displayLine={displayLine}
             isLive={false}
+            isPlaying={isPlaying}
             startReplayMethod={start_replay}
             pauseReplayMethod={stop_replay}
         />

@@ -12,6 +12,7 @@ interface Props {
     displayLine: string[],
     headers: string[],
     isLive: boolean,
+    isPlaying: boolean,
     startReplayMethod: (event: MouseEvent) => void,
     pauseReplayMethod: (event: MouseEvent) => void,
 }
@@ -21,6 +22,7 @@ let {
     isLive = false,
     displayLine,
     headers,
+    isPlaying,
     startReplayMethod,
     pauseReplayMethod
 }: Props = $props()
@@ -41,11 +43,20 @@ let rocketPitch = $state(0);
 let rocketYaw = $state(0);
 
 function moveModel() {
+    if (isLive) {
+        moveLiveModel();
+        return;
+    }
+
     let rotation: number[] = get_rotation();
     // console.log(rotation);
     rocketRoll = rotation[0];
     rocketPitch = rotation[1];
     rocketYaw = rotation[2];
+}
+
+function moveLiveModel() {
+    // TODO - get rotation data from line then update the model
 }
 
 </script>
@@ -72,13 +83,13 @@ function moveModel() {
             >
                 Return
             </button>
-            <button onclick={startReplayMethod}>Play</button>
-            <button onclick={pauseReplayMethod}>Pause</button>
+        {/if}
+
+        <button onclick={startReplayMethod} disabled={isPlaying}>Play</button>
+        <button onclick={pauseReplayMethod} disabled={!isPlaying}>Pause</button>
+
+        {#if !isLive}
             <h3>{fileName}</h3>
-        {:else}
-            <!-- For now, I'm sure logic of getting connected to a board will be different -->
-            <button onclick={startReplayMethod}>Play</button>
-            <button onclick={pauseReplayMethod}>Pause</button>
         {/if}
     </div>
     <div class="flight-data">
