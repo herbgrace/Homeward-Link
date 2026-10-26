@@ -2,6 +2,7 @@ mod state_controller;
 mod config_controller;
 mod file_controller;
 mod usb_reader;
+mod telem_decoder;
 
 use core::error;
 use tauri::{Manager};
