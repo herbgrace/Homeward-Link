@@ -1,5 +1,6 @@
 use serde::Serialize;
 use serialport::{SerialPortType, UsbPortInfo};
+use std::collections::HashSet;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -32,12 +33,20 @@ struct Status {
 /// "Acceleration X: 5.00 | Acceleration Y: 1.45 | ... | Temperature: 27.84"
 fn parse_esp32(line: &str) -> Option<Telemetry> {
     let mut t = Telemetry::default();
-    let mut seen = 0;
+    let mut seen: HashSet<&str> = HashSet::new();
 
     for part in line.split('|') {
         let (key, val) = part.split_once(':')?;
         let val: f32 = val.trim().parse().ok()?;
-        match key.trim() {
+
+        let key = key.trim();
+
+        if !seen.insert(key) {
+            // Duplicate Key, don't overwrite data
+            continue;
+        }
+
+        match key {
             "Acceleration X" => t.accel_x = val,
             "Acceleration Y" => t.accel_y = val,
             "Acceleration Z" => t.accel_z = val,
@@ -45,12 +54,14 @@ fn parse_esp32(line: &str) -> Option<Telemetry> {
             "Rotation Y" => t.rot_y = val,
             "Rotation Z" => t.rot_z = val,
             "Temperature" => t.temperature = val,
-            _ => continue,
+            _ => {
+                seen.remove(key); // Not a valid key, shouldn't count towards seen
+                continue;
+            }
         }
-        seen += 1;
     }
     // Only accept lines containing all 7 fields (rejects boot noise / partial lines)
-    (seen == 7).then_some(t)
+    (seen.len() == 7).then_some(t)
 }
 
 // ---------- Device profiles ----------
@@ -225,4 +236,77 @@ pub fn start_serial(app: AppHandle, state: State<SerialManager>) {
 #[tauri::command]
 pub fn stop_serial(state: State<SerialManager>) {
     state.stop();
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FULL: &str = "Acceleration X: 5.00 | Acceleration Y: 1.45 | Acceleration Z: -9.81 | \
+                        Rotation X: 0.10 | Rotation Y: -0.20 | Rotation Z: 0.30 | Temperature: 27.84";
+
+    fn usb(vid: u16, pid: u16, product: Option<&str>) -> UsbPortInfo {
+        // If this fails to compile with "missing field `interface`", add `interface: None`
+        UsbPortInfo { vid, pid, serial_number: None, manufacturer: None, product: product.map(String::from) }
+    }
+    fn profile(name: &str) -> &'static DeviceProfile {
+        PROFILES.iter().find(|p| p.name == name).unwrap()
+    }
+
+    #[test]
+    fn parses_a_complete_line() {
+        let t = parse_esp32(FULL).unwrap();
+        assert_eq!((t.accel_x, t.accel_y, t.accel_z), (5.0, 1.45, -9.81));
+        assert_eq!((t.rot_x, t.rot_y, t.rot_z), (0.1, -0.2, 0.3));
+        assert_eq!(t.temperature, 27.84);
+    }
+
+    #[test]
+    fn rejects_incomplete_or_garbage_lines() {
+        assert!(parse_esp32("").is_none());
+        assert!(parse_esp32("ESP-ROM:esp32c3-api1-20210207").is_none());
+        assert!(parse_esp32("Acceleration X: 5.00 | Acceleration Y: 1.45").is_none()); // partial
+        assert!(parse_esp32(&FULL.replace("27.84", "warm")).is_none());                // non-numeric
+        assert!(parse_esp32(&format!("{FULL} |")).is_none());                          // trailing separator
+    }
+
+    #[test]
+    fn unknown_keys_are_ignored_but_do_not_count() {
+        assert!(parse_esp32(&format!("{FULL} | Humidity: 40")).is_some());
+        let without_temp = FULL.rsplit_once(" | ").unwrap().0;
+        assert!(parse_esp32(&format!("{without_temp} | Humidity: 40")).is_none());
+    }
+
+    #[test]
+    fn duplicate_key_does_not_stand_in_for_a_missing_one() {
+        let without_temp = FULL.rsplit_once(" | ").unwrap().0;
+        assert!(parse_esp32(&format!("{without_temp} | Acceleration X: 1.0")).is_none());
+    }
+
+    #[test]
+    fn esp32_profile_matches_common_usb_serial_chips() {
+        let p = profile("ESP32");
+        for (vid, pid) in [(0x10C4, 0xEA60), (0x1A86, 0x7523), (0x1A86, 0x55D4), (0x0403, 0x6001), (0x303A, 0x1001)] {
+            assert!((p.matches)(&usb(vid, pid, None)), "{vid:04x}:{pid:04x}");
+        }
+        assert!(!(p.matches)(&usb(0x1234, 0x5678, None)));
+    }
+
+    #[test]
+    fn teledongle_profile_matches_by_ids_or_product_name() {
+        let p = profile("TeleDongle");
+        assert!((p.matches)(&usb(0xFFFE, 0x000C, None)));
+        assert!((p.matches)(&usb(0x0000, 0x0000, Some("TeleDongle v3.0"))));
+        assert!((p.matches)(&usb(0x0000, 0x0000, Some("my TELEDONGLE"))));
+        assert!(!(p.matches)(&usb(0xFFFE, 0x000A, Some("TeleMetrum"))));
+    }
+
+    #[test]
+    fn profiles_do_not_claim_each_others_devices() {
+        // find_device() takes the first match, so overlap would cause misdetection
+        let dongle = usb(0xFFFE, 0x000C, Some("TeleDongle"));
+        assert!(!(profile("ESP32").matches)(&dongle));
+        assert!(!(profile("TeleDongle").matches)(&usb(0x10C4, 0xEA60, None)));
+    }
 }
