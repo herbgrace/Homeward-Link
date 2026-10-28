@@ -82,11 +82,11 @@ pub struct GpsFlags {
 impl GpsFlags {
     fn from_byte(b: u8) -> Self {
         Self {
-            nsats:        b & 0x0f,
-            valid:        b & (1 << 4) != 0,
-            running:      b & (1 << 5) != 0,
-            date_valid:   b & (1 << 6) != 0,
-            course_valid: b & (1 << 7) != 0,
+            nsats:        b & 0x0f,             // AND with 0000 1111 to get first 4
+            valid:        b & (1 << 4) != 0,    // AND with 0001 0000
+            running:      b & (1 << 5) != 0,    // AND with 0010 0000
+            date_valid:   b & (1 << 6) != 0,    // AND with 0100 0000
+            course_valid: b & (1 << 7) != 0,    // AND with 1000 0000
         }
     }
 }
@@ -286,12 +286,149 @@ pub enum DecodeError {
     BadChecksum { expected: u8, got: u8 },
     CrcFailed,                         // LQI bit 7 clear: radio says corrupt
     Truncated,                         // payload shorter than its layout needs
+    BadPacketLength,
+    BadPayloadLength,
+    ConversionError,
+    UnknownDataType
 }
 
 /// line -> framing check -> header + payload bytes -> typed payload
-pub fn parse_line(line: &str) -> Result<Telemetry, DecodeError> { todo!() }
+pub fn parse_line(line: &str) -> Result<Telemetry, DecodeError> { 
+    let start = "TELEM ";
+    if !line.starts_with(start) {
+        return Err(DecodeError::BadPrefix);
+    }
 
-// internal steps
-fn hex_to_bytes(s: &str) -> Result<Vec<u8>, DecodeError> { todo!() }
-fn verify_frame(bytes: &[u8]) -> Result<(&[u8; PACKET_LEN], LinkInfo), DecodeError> { todo!() }
-fn decode_payload(type_id: u8, raw: &[u8; PAYLOAD_LEN]) -> Result<Payload, DecodeError> { todo!() }
+    let line = line.trim_start_matches(start);
+    let bytes = hex_to_bytes(&line)?; 
+
+    // Bytes is 32 long (includes header)
+    let (bytes, link) = verify_frame(&bytes)?;
+
+    // 2 bytes of Serial, 2 bytes of Tick
+    let type_id: u8 = bytes[4];
+
+    // 27 bytes of payload data
+    let (bytes, header) = extract_headers(&bytes)?;
+
+    // Returns the formatted version of the payload data
+    let payload = decode_payload(type_id, &bytes)?;
+
+    let resp = Telemetry {
+        header: header,
+        link: link,
+        payload: payload
+    };
+
+    Ok(resp)
+}
+
+// Convert the entire line into a Vec of bytes
+fn hex_to_bytes(s: &str) -> Result<Vec<u8>, DecodeError> { 
+    // Shouldn't start with it, but just in case it does
+    let s = s.trim_start_matches("0x");
+
+    hex::decode(s).map_err(|_| DecodeError::BadHex)
+}
+
+// Pull out RSSI & LQI information, Verify Length is correct, verify Checksum is correct
+fn verify_frame(bytes: &[u8]) -> Result<([u8; PACKET_LEN], LinkInfo), DecodeError> { 
+    let given_len: usize = bytes[0].try_into().map_err(|_| DecodeError::BadHex)?; // 34
+    let act_len = bytes.len(); // 36 (Includes length and sum bytes)
+
+    // Lost bytes somewhere in transit, Given length isn't the same as its actual length
+    // +2 because given_len does not include length and sum bytes, while the actual length does
+    if given_len + 2 != act_len {
+        return Err(DecodeError::BadLength { expected: given_len + 2, got: act_len })
+    }
+
+    // Given length is accurate, but not the length that is expected 
+    // +2 because PACKET_LEN does not include RSSI & LQI data while given_len does
+    if given_len != PACKET_LEN + 2 {
+        return Err(DecodeError::BadLength { expected: PACKET_LEN, got: given_len });
+    }
+
+    check_sum(bytes)?;
+
+    let lqi = bytes[act_len - 2]; // 1 for checksum & one for going from 1 based to 0 based
+    let rssi = bytes[act_len - 3];
+    let crc_ok = lqi & (1 << 6) == 1; // If the 7th bit is on (AND with 0100 0000) 
+
+    if !crc_ok {
+        return Err(DecodeError::CrcFailed);
+    }
+
+    let link = LinkInfo {
+        lqi: lqi,
+        rssi_dbm: f32::from(rssi) / 2.0 - 74.0,
+        crc_ok: crc_ok
+    };
+
+    let packet = &bytes[1..=PACKET_LEN];
+    let packet: [u8; PACKET_LEN] = packet.try_into().map_err(|_| DecodeError::BadPacketLength)?;
+
+    Ok((packet, link))
+}
+
+fn check_sum(bytes: &[u8]) -> Result<(), DecodeError> {
+    let len = bytes.len();
+    let mut sum: i32 = 0x5a;
+
+    for b in bytes {
+        sum += i32::from(*b);
+    }
+    sum &= 0xff; // Get the last 8 bits
+    let sum: u8 = sum.try_into().map_err(|_| DecodeError::ConversionError)?;
+
+    if !(sum == bytes[len - 1]) {
+        return Err(DecodeError::BadChecksum { expected: bytes[len - 1], got: sum });
+    }
+
+    Ok(())
+}
+
+// Pull out header bytes from the payload bytes
+fn extract_headers(bytes: &[u8; PACKET_LEN]) -> Result<([u8; PAYLOAD_LEN], Header), DecodeError> { 
+    // Take the byte on the left, shift its bits by 4, then add to byte on the right
+
+    let serial = u16::from(bytes[0]) << 4;
+    let serial =  serial + u16::from(bytes[1]);
+    
+    let tick = u16::from(bytes[2]) << 4;
+    let tick = tick + u16::from(bytes[3]);
+
+    let telem_type = bytes[4];
+
+    let header = Header {
+        serial: serial,
+        tick: tick,
+        type_id: telem_type
+    };
+
+    let resp: [u8; PAYLOAD_LEN] = bytes[5..bytes.len()].try_into().map_err(|_| DecodeError::BadPayloadLength)?;
+    Ok((resp, header))
+}
+
+// Convert the line into its Payload type
+fn decode_payload(type_id: u8, raw: &[u8; PAYLOAD_LEN]) -> Result<Payload, DecodeError> { 
+    let payload_type = match type_id {
+        0x01 | 0x02 | 0x03          =>  Payload::Sensor(Sensor::decode(type_id, raw)?),
+        0x04                        =>  Payload::Config(Config::decode(type_id, raw)?),
+        0x05                        =>  Payload::Location(Location::decode(type_id, raw)?),
+        0x06                        =>  Payload::Satellites(Satellites::decode(type_id, raw)?),
+        0x07                        =>  Payload::Companion(Companion::decode(type_id, raw)?),
+        0x08 | 0x12 | 0x13 | 0x14   =>  Payload::MegaImu(MegaImu::decode(type_id, raw)?),
+        0x09 | 0x15                 =>  Payload::MegaKalman(MegaKalman::decode(type_id, raw)?),
+        0x11                        =>  Payload::MiniSensor(MiniSensor::decode(type_id, raw)?),
+        0x0A                        =>  Payload::MetrumSensor(MetrumSensor::decode(type_id, raw)?),
+        0x0B                        =>  Payload::MetrumCalibration(MetrumCalibration::decode(type_id, raw)?),
+
+        _ => Payload::Unknown { type_id: type_id, raw: *raw }
+    };
+
+    if matches!(payload_type, Payload::Unknown { .. }) {
+        return Err(DecodeError::UnknownDataType);
+    }
+
+    Ok(payload_type)
+}
