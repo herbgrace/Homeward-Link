@@ -4,7 +4,7 @@ import { page } from "$app/state";
 
 import SettingsMenu from "./SettingsMenu.svelte";
 
-let paths: string[] = ['/', '/Previous-Flights', '/Live-Flight', '/Calendar']
+let paths: string[] = ['/', '/Live-Flight', '/Previous-Flights', '/Calendar']
 let currentRoute: string = $derived(page.url.pathname)
 let activeId: number = $derived(paths.findIndex(route => {
     return route.toLowerCase() == currentRoute

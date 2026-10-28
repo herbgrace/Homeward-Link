@@ -112,7 +112,7 @@
 
   // React to prop changes from the parent component
   $effect(() => {
-    console.log("Updating the model's rotation")
+    // console.log("Updating the model's rotation")
     rotationX;
     rotationY;
     rotationZ;
@@ -121,4 +121,11 @@
 </script>
 
 <!-- Give the container an explicit height class so it never collapses to 0 -->
-<div bind:this={container} class="w-full h-[350px] overflow-hidden"></div>
+<div bind:this={container} class="model-renderer"></div>
+
+<style>
+  .model-renderer {
+    border: 2px solid;
+    color: var(--accent-color);
+  }
+</style>

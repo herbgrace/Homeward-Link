@@ -1,7 +1,7 @@
 <script lang="ts">
 import { goto } from '$app/navigation';
-import NavigationBar from '$lib/svelte_components/NavigationBar.svelte';
-import { loadEntries } from '$lib/ts_helpers/savedFlightUtils';
+import NavigationBar from '$lib/components/NavigationBar.svelte';
+import { loadEntries } from '$lib/utils/savedFlightUtils';
 
 let statusMessage: string = $state('Loading Files...');
 let loadedFiles: string[] = $state([]);
@@ -22,7 +22,7 @@ function clickEntry(entryIndex: number) {
     const queryParams = new URLSearchParams ({
         filePath: loadedFiles[entryIndex]
     });
-    goto(`/display-flight?${queryParams.toString()}`)
+    goto(`/display-previous-flight?${queryParams.toString()}`)
 }
 
 refreshEntries();
@@ -50,7 +50,7 @@ refreshEntries();
 <style>
     ul {
         display: block;
-        padding-left: 0.25rem;
+        padding-left: 0.75rem;
         padding-right: 0.25rem;
         justify-content: center;
     }

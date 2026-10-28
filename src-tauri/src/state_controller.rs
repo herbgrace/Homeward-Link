@@ -1,4 +1,4 @@
-use tauri::Manager;
+use tauri::{Manager};
 
 // This file is for managing the application's state
 use crate::config_controller;
@@ -93,3 +93,14 @@ pub fn increment_current_block(state: &tauri::State<'_, AppState>) -> Result<(),
     get_current_block(state)
         .and_then(|current| Ok(*state.current_block.lock().unwrap() = current + 1))
 }
+
+// pub fn get_receiver(state: &tauri::State<'_, AppState>) -> Result<Option<DeviceProfile>, String> {
+//     Ok(*state.receiver_device.lock().unwrap().clone())
+// }
+
+// pub fn update_receiver(state: &tauri::State<'_, AppState>, profile: DeviceProfile) -> Result<(), Box<dyn error::Error>> {
+//     let mut curr_profile = state.receiver_device.lock().unwrap();
+//     *curr_profile = Some(profile); 
+
+//     Ok(())  
+// }
