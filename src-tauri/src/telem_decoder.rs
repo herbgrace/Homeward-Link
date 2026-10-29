@@ -1,3 +1,7 @@
+use core::fmt;
+
+use serde::Serialize;
+
 pub const PACKET_LEN: usize = 32; // Does not include length byte or checksum byte
 pub const PAYLOAD_LEN: usize = PACKET_LEN - 5; // 27 data bytes
 
@@ -23,6 +27,7 @@ impl<'a> Cursor<'a> {
     pub fn u8(&mut self) -> Result<u8, DecodeError> {
         Ok(self.take::<1>()?[0])
     }
+    #[allow(dead_code)]
     pub fn i8(&mut self) -> Result<i8, DecodeError> {
         Ok(self.take::<1>()?[0] as i8)
     }
@@ -54,7 +59,7 @@ impl<'a> Cursor<'a> {
 }
 
 /// What the TeleDongle appended/prepended (not part of the radio packet)
-#[derive(Debug, Clone, Copy)]
+#[derive(Serialize, Debug, Clone, Copy)]
 pub struct LinkInfo {
     pub rssi_dbm: f32, // derived from raw i8: raw as f32 / 2.0 - 74.0
     pub lqi: u8,
@@ -62,21 +67,23 @@ pub struct LinkInfo {
 }
 
 /// Common to every packet
-#[derive(Debug, Clone, Copy)]
+#[derive(Serialize, Debug, Clone, Copy)]
 pub struct Header {
     pub serial: u16, // Serial Number of Transmitting Device
     pub tick: u16,   // Current Relative Timestamp (1/100ths of a second)
     pub type_id: u8, // What Type of Data is transmitted
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all="camelCase")]
 pub struct Telemetry {
     pub header: Header,
     pub link: LinkInfo,
     pub payload: Payload,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
+#[serde(tag="type")]
 pub enum Payload {
     Sensor(Sensor),         // 0x01 / 0x02 / 0x03 (TeleMetrum v1, TeleMini v1, TeleNano)
     Config(Config),         // 0x04
@@ -96,7 +103,7 @@ pub trait PayloadDecode: Sized {
     fn decode(type_id: u8, raw: &[u8; PAYLOAD_LEN]) -> Result<Self, DecodeError>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Location {
     flags: GpsFlags, // Based on the first byte of information
     altitude: i16,   // m
@@ -149,7 +156,7 @@ impl PayloadDecode for Location {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct GpsFlags {
     nsats: u8,          // Bits 0-3, Number of Satellites in Solution
     valid: bool,        // Bit 4, GPS Solution is Valid
@@ -170,7 +177,7 @@ impl GpsFlags {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub enum GpsMode {
     NotValid,     // All Data is Invalid
     Autonomous,   // Data is Derived from Satellite Data
@@ -195,7 +202,7 @@ impl GpsMode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Satellites {
     channels: u8, // Number of Reported Satellite Information
     sats: [SatelliteInfo; 12], // Up to 12 channels of Satellite Information (2 bytes each)
@@ -224,7 +231,7 @@ impl PayloadDecode for Satellites {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Serialize, Debug, Clone, Copy, Default)]
 pub struct SatelliteInfo {
     svid: u8,  // Space Vehicle Identifier
     c_n_1: u8, // C/N1 signal quality indicator
@@ -239,7 +246,7 @@ impl SatelliteInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Sensor {
     state: u8,          // Flight State
     accel: i16,         // Accelerometer (Not TeleNano/TeleMini)
@@ -293,13 +300,13 @@ impl PayloadDecode for Sensor {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub enum SensorKind {
     TeleMetrumV1,
     TeleMiniV1,
     TeleNano,
 }
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct MegaImu {
     orient: u8,   // Angle from Vertical (degrees)
     accel: i16,   // High G Accelerometer
@@ -317,7 +324,7 @@ pub struct MegaImu {
     kind: ImuKind,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub enum ImuKind {
     Invensense,
     BMX160,
@@ -360,7 +367,7 @@ impl PayloadDecode for MegaImu {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct MegaKalman {
     state: u8,          // Flight State
     v_batt: i16,        // Battery Voltage
@@ -376,7 +383,7 @@ pub struct MegaKalman {
     voltage: VoltageRange,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub enum VoltageRange {
     V15,
     V30,
@@ -413,7 +420,7 @@ impl PayloadDecode for MegaKalman {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct MetrumSensor {
     state: u8,         // Flight State
     accel: i16,        // Accelerometer
@@ -452,7 +459,7 @@ impl PayloadDecode for MetrumSensor {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct MetrumCalibration {
     // 3 bytes of padding
     ground_pres: i32,  // Average Barometer Reading on Ground
@@ -482,7 +489,7 @@ impl PayloadDecode for MetrumCalibration {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct MiniSensor {
     state: u8,         // Flight State
     v_batt: i16,       // Battery Voltage
@@ -521,7 +528,7 @@ impl PayloadDecode for MiniSensor {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Config {
     dev_type: u8,        // Device Type
     flight: u16,         // Flight Number
@@ -558,7 +565,7 @@ impl PayloadDecode for Config {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Companion {
     board_id: u8,              // Type of Companion Board Attached
     update_period: u8,         // How often Telemetry is sent (1/100ths of a second)
@@ -590,7 +597,7 @@ impl PayloadDecode for Companion {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Debug)]
 pub enum DecodeError {
     BadPrefix, // line doesn't start with "TELEM "
     BadHex,
@@ -602,6 +609,23 @@ pub enum DecodeError {
     BadPayloadLength,
     ConversionError,
     InvalidTypeId,
+}
+
+impl fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DecodeError::BadPrefix => write!(f, "Telemetry Line doesn't start with \"TELEM\""),
+            DecodeError::BadHex => write!(f, "Telemetry Line include invalid HEX data"),
+            DecodeError::BadLength { expected, got} => write!(f, "Invalid Line length, Expected {} but got {}.", expected, got),
+            DecodeError::BadChecksum { expected, got } => write!(f, "Checksum did not match, Expected {} but got {}", expected, got),
+            DecodeError::CrcFailed => write!(f, "Bit 7 of LQI was off, CRC is incorrect"),
+            DecodeError::Truncated => write!(f, "Not enough provided data for the given type"),
+            DecodeError::BadPacketLength => write!(f, "Invalid packet length, correct length is {} bytes", PACKET_LEN),
+            DecodeError::BadPayloadLength => write!(f, "Invalid payload length, correct length is {} bytes", PAYLOAD_LEN),
+            DecodeError::ConversionError => write!(f, "Error converting data types when verifying checksum"),
+            DecodeError::InvalidTypeId => write!(f, "Given data type ID does not exist"),
+        }
+    }
 }
 
 // line -> framing check -> header + payload bytes -> typed payload
@@ -769,7 +793,7 @@ mod tests {
 
     /// Payload builder. build() insists on exactly 27 bytes, so a wrong
     /// layout in a test fails loudly instead of silently shifting fields.
-    #[derive(Default)]
+    #[derive(Serialize, Default)]
     struct Pb(Vec<u8>);
     impl Pb {
         fn u8(mut self, v: u8) -> Self {
