@@ -1,9 +1,138 @@
 use core::fmt;
-
 use serde::Serialize;
+
+use crate::telem_models::{
+    Companion, Config, FlightState, GpsFlags, GpsMode, ImuKind, LoadStats, Location, MegaImu,
+    MegaKalman, MetrumCalibration, MetrumSensor, MiniSensor, Payload, SatelliteInfo, Satellites,
+    Sensor, SensorKind, Snapshot, VoltageRange,
+};
 
 pub const PACKET_LEN: usize = 32; // Does not include length byte or checksum byte
 pub const PAYLOAD_LEN: usize = PACKET_LEN - 5; // 27 data bytes
+
+/// AltOS flight state 3 = boost (confirmed by your CSV).
+const STATE_BOOST: u8 = 3;
+/// Seconds of pad time to keep before the first boost report. AltOS keeps none.
+const PAD_LEAD_S: f64 = 0.0;
+
+/// Unwraps the 16-bit, 1/100 s tick counter (wraps every ~655 s) into a continuous clock.
+#[derive(Default)]
+struct TickClock {
+    last: Option<u64>,
+}
+
+impl TickClock {
+    fn unwrap_ms(&mut self, tick: u16) -> u64 {
+        let ticks = match self.last {
+            None => tick as u64,
+            Some(prev) => {
+                // signed shortest distance: correct across a wrap AND for late packets
+                let delta = tick.wrapping_sub(prev as u16) as i16;
+                (prev as i64 + delta as i64).max(0) as u64
+            }
+        };
+        self.last = Some(ticks);
+        ticks * 10
+    }
+}
+
+/// Merges packets into a running FlightState.
+#[derive(Default)]
+struct Accumulator {
+    latest: FlightState,
+    clock: TickClock,
+}
+
+impl Accumulator {
+    /// Returns a snapshot for IMU and Kalman packets, which is what AltOS' CSV rows appear to be.
+    fn push(&mut self, t: &Telemetry) -> Option<Snapshot> {
+        let uptime_ms = self.clock.unwrap_ms(t.header.tick);
+
+        let emit = match &t.payload {
+            Payload::MegaImu(m) => {
+                self.latest.imu = Some(m.clone());
+                true
+            }
+            Payload::MegaKalman(k) => {
+                self.latest.kalman = Some(k.clone());
+                true
+            }
+            Payload::Location(l) => {
+                self.latest.gps = Some(l.clone());
+                false
+            }
+            Payload::Satellites(s) => {
+                self.latest.sats = Some(s.clone());
+                false
+            }
+            Payload::Config(c) => {
+                self.latest.config = Some(c.clone());
+                false
+            }
+            _ => false, // add arms for TeleMetrum/TeleMini payloads as needed
+        };
+
+        emit.then(|| Snapshot {
+            uptime_ms,
+            time_s: 0.0, // filled in by set_relative_times once the whole file is known
+            link: t.link,
+            latest: self.latest.clone(),
+        })
+    }
+}
+
+/// Decode raw TELEM lines into merged snapshots. Pure: no file access.
+pub fn build_snapshots<I>(lines: I) -> (Vec<Snapshot>, LoadStats)
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut acc = Accumulator::default();
+    let mut stats = LoadStats::default();
+    let mut snapshots = Vec::new();
+
+    for line in lines {
+        if line.trim().is_empty() {
+            continue;
+        }
+        stats.lines += 1;
+
+        match parse_line(&line) {
+            Ok(t) => {
+                stats.ok += 1;
+                if let Some(s) = acc.push(&t) {
+                    snapshots.push(s);
+                }
+            }
+            Err(DecodeError::CrcFailed) => stats.crc_failed += 1,
+            Err(_) => stats.other_errors += 1,
+        }
+    }
+
+    set_relative_times(&mut snapshots);
+    (snapshots, stats)
+}
+
+/// t = 0 at the first Kalman packet reporting boost or later (AltOS falls back to the first tick).
+/// Everything before it is dropped, as AltOS does for the pad phase.
+fn set_relative_times(snaps: &mut Vec<Snapshot>) {
+    let t0 = snaps
+        .iter()
+        .find(|s| {
+            s.latest
+                .kalman
+                .as_ref()
+                .map_or(false, |k| k.state >= STATE_BOOST)
+        })
+        .or(snaps.first())
+        .map(|s| s.uptime_ms);
+
+    let Some(t0) = t0 else { return };
+
+    for s in snaps.iter_mut() {
+        s.time_s = (s.uptime_ms as f64 - t0 as f64) / 1000.0;
+    }
+    snaps.retain(|s| s.time_s >= -PAD_LEAD_S);
+}
 
 // Struct to help with reading bytes in the array
 pub struct Cursor<'a> {
@@ -60,6 +189,7 @@ impl<'a> Cursor<'a> {
 
 /// What the TeleDongle appended/prepended (not part of the radio packet)
 #[derive(Serialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
 pub struct LinkInfo {
     pub rssi_dbm: f32, // derived from raw i8: raw as f32 / 2.0 - 74.0
     pub lqi: u8,
@@ -68,6 +198,7 @@ pub struct LinkInfo {
 
 /// Common to every packet
 #[derive(Serialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
 pub struct Header {
     pub serial: u16, // Serial Number of Transmitting Device
     pub tick: u16,   // Current Relative Timestamp (1/100ths of a second)
@@ -75,54 +206,15 @@ pub struct Header {
 }
 
 #[derive(Serialize, Debug, Clone)]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct Telemetry {
     pub header: Header,
     pub link: LinkInfo,
     pub payload: Payload,
 }
 
-#[derive(Serialize, Debug, Clone)]
-#[serde(tag="type")]
-pub enum Payload {
-    Sensor(Sensor),         // 0x01 / 0x02 / 0x03 (TeleMetrum v1, TeleMini v1, TeleNano)
-    Config(Config),         // 0x04
-    Location(Location),     // 0x05
-    Satellites(Satellites), // 0x06
-    Companion(Companion),   // 0x07
-    MegaImu(MegaImu),       // 0x08 / 0x12 / 0x13 / 0x14 (same layout, different sensors)
-    MegaKalman(MegaKalman), // 0x09 / 0x15 (differ in voltage scaling)
-    MiniSensor(MiniSensor), // 0x11 (TeleMini v3)
-    MetrumSensor(MetrumSensor), // 0x0A (TeleMetrum v2 Sensor)
-    MetrumCalibration(MetrumCalibration), // 0x0B (TeleMetrum v2 Calibration)
-
-    Unknown { type_id: u8, raw: [u8; PAYLOAD_LEN] },
-}
-
 pub trait PayloadDecode: Sized {
     fn decode(type_id: u8, raw: &[u8; PAYLOAD_LEN]) -> Result<Self, DecodeError>;
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct Location {
-    flags: GpsFlags, // Based on the first byte of information
-    altitude: i16,   // m
-    latitude: i32,   // degrees * 10^7
-    longitude: i32,  // degrees * 10^7
-    year: u8,
-    month: u8,
-    day: u8,
-    hour: u8,
-    minute: u8,
-    second: u8,
-    pdop: u8,      // * 5
-    hdop: u8,      // * 5
-    vdop: u8,      // * 5
-    mode: GpsMode, // 1 byte
-    ground_speed: u16,
-    climb_rate: i16,
-    course: u8,
-    // 1 Byte of padding
 }
 
 impl PayloadDecode for Location {
@@ -156,15 +248,6 @@ impl PayloadDecode for Location {
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct GpsFlags {
-    nsats: u8,          // Bits 0-3, Number of Satellites in Solution
-    valid: bool,        // Bit 4, GPS Solution is Valid
-    running: bool,      // Bit 5, GPS Receiver is Operational
-    date_valid: bool,   // Bit 6, Reported Date is valid
-    course_valid: bool, // Bit 7, Ground Speed, Course, & Climb Rates are Valid
-}
-
 impl GpsFlags {
     fn from_byte(b: u8) -> Self {
         Self {
@@ -175,17 +258,6 @@ impl GpsFlags {
             course_valid: b & (1 << 7) != 0, // AND with 1000 0000
         }
     }
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub enum GpsMode {
-    NotValid,     // All Data is Invalid
-    Autonomous,   // Data is Derived from Satellite Data
-    Differential, // Data is Augmented with Differential Data from a Known Ground Station
-    Estimated,    // Data is Estimated using Dead Reckoning from the Last Known Data
-    Manual,       // Data was Entered Manually
-    Simulated,    // GPS Receiver Testing Mode
-    Other(u8),
 }
 
 impl GpsMode {
@@ -200,13 +272,6 @@ impl GpsMode {
             other => Self::Other(other),
         }
     }
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct Satellites {
-    channels: u8, // Number of Reported Satellite Information
-    sats: [SatelliteInfo; 12], // Up to 12 channels of Satellite Information (2 bytes each)
-                  // 2 Bytes of Padding
 }
 
 impl PayloadDecode for Satellites {
@@ -231,12 +296,6 @@ impl PayloadDecode for Satellites {
     }
 }
 
-#[derive(Serialize, Debug, Clone, Copy, Default)]
-pub struct SatelliteInfo {
-    svid: u8,  // Space Vehicle Identifier
-    c_n_1: u8, // C/N1 signal quality indicator
-}
-
 impl SatelliteInfo {
     pub fn new(svid: u8, c_n_1: u8) -> Self {
         SatelliteInfo {
@@ -244,25 +303,6 @@ impl SatelliteInfo {
             c_n_1: c_n_1,
         }
     }
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct Sensor {
-    state: u8,          // Flight State
-    accel: i16,         // Accelerometer (Not TeleNano/TeleMini)
-    pres: i16,          // Pressure Sensor
-    temp: i16,          // Temperature Sensor
-    v_batt: i16,        // Battery Voltage
-    sense_d: i16,       // Drogue Continuity Sense (Not TeleNano)
-    sense_m: i16,       // Main Continuity (Not TeleNano)
-    acceleration: i16,  // m/s^2 * 16
-    speed: i16,         // m/s * 16
-    height: i16,        // m
-    ground_pres: i16,   // Average Barometer Reading on Ground
-    ground_accel: i16,  // (Not TeleNano/TeleMini)
-    accel_plus_g: i16,  // (Not TeleNano/TeleMini)
-    accel_minus_g: i16, // (Not TeleNano/TeleMini)
-    kind: SensorKind,
 }
 
 impl PayloadDecode for Sensor {
@@ -300,38 +340,6 @@ impl PayloadDecode for Sensor {
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub enum SensorKind {
-    TeleMetrumV1,
-    TeleMiniV1,
-    TeleNano,
-}
-#[derive(Serialize, Debug, Clone)]
-pub struct MegaImu {
-    orient: u8,   // Angle from Vertical (degrees)
-    accel: i16,   // High G Accelerometer
-    pres: i32,    // Pressure (Pa * 10)
-    temp: i16,    // Temperature (°C * 100)
-    accel_x: i16, // X Axis Acceleration (across)
-    accel_y: i16, // Y Axis Acceleration (Along)
-    accel_z: i16, // Z Axis Acceleration (Through)
-    gyro_x: i16,  // X Axis Rotation (Roll)
-    gyro_y: i16,  // Y Axis Rotation (Pitch)
-    gyro_z: i16,  // Z Axis Rotation (Yaw)
-    mag_x: i16,   // X Field Strength (Across)
-    mag_y: i16,   // Y Field Strength (Along)
-    mag_z: i16,   // Z Field Strength (Through)
-    kind: ImuKind,
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub enum ImuKind {
-    Invensense,
-    BMX160,
-    MPU6000,
-    BMI088,
-}
-
 impl PayloadDecode for MegaImu {
     fn decode(type_id: u8, raw: &[u8; PAYLOAD_LEN]) -> Result<Self, DecodeError> {
         let mut c = Cursor::new(raw);
@@ -367,28 +375,6 @@ impl PayloadDecode for MegaImu {
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct MegaKalman {
-    state: u8,          // Flight State
-    v_batt: i16,        // Battery Voltage
-    v_pyro: i16,        // Pyro Battery Voltage
-    sense: [u8; 6],     // Pyro Continuity Sense
-    ground_pres: i32,   // Average Barometer Reading on Ground
-    ground_accel: i16,  // Average Accelerometer Reading on Ground
-    accel_plus_g: i16,  // Accel Calibration at +1g
-    accel_minus_g: i16, // Accel Calibration at -1g
-    acceleration: i16,  // m/s^2 * 16
-    speed: i16,         // m/s * 16
-    height: i16,        // m
-    voltage: VoltageRange,
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub enum VoltageRange {
-    V15,
-    V30,
-}
-
 impl PayloadDecode for MegaKalman {
     fn decode(type_id: u8, raw: &[u8; PAYLOAD_LEN]) -> Result<Self, DecodeError> {
         let mut c = Cursor::new(raw);
@@ -420,21 +406,6 @@ impl PayloadDecode for MegaKalman {
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct MetrumSensor {
-    state: u8,         // Flight State
-    accel: i16,        // Accelerometer
-    pres: i32,         // Pressure Sensor (Pa * 10)
-    temp: i16,         // Temperature Sensor (°C * 100)
-    acceleration: i16, // m/s^2 * 16
-    speed: i16,        // m/s * 16
-    height: i16,       // m
-    v_batt: i16,       // Battery Voltage
-    sense_d: i16,      // Drogue Continuity Sense
-    sense_m: i16,      // Main Continuity Sense
-                       // 6 Bytes of padding
-}
-
 impl PayloadDecode for MetrumSensor {
     fn decode(_type_id: u8, raw: &[u8; PAYLOAD_LEN]) -> Result<Self, DecodeError> {
         let mut c = Cursor::new(raw);
@@ -459,16 +430,6 @@ impl PayloadDecode for MetrumSensor {
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct MetrumCalibration {
-    // 3 bytes of padding
-    ground_pres: i32,  // Average Barometer Reading on Ground
-    ground_accel: i16, // Average Accelerometer Reading on Ground
-    accel_plus_g: i16, // Accel calibration at +1g
-    accel_minus_g: i16, // Accel calibration at -1g
-                       // 14 bytes of padding
-}
-
 impl PayloadDecode for MetrumCalibration {
     fn decode(_type_id: u8, raw: &[u8; PAYLOAD_LEN]) -> Result<Self, DecodeError> {
         let mut c = Cursor::new(raw);
@@ -487,21 +448,6 @@ impl PayloadDecode for MetrumCalibration {
 
         Ok(resp)
     }
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct MiniSensor {
-    state: u8,         // Flight State
-    v_batt: i16,       // Battery Voltage
-    sense_a: i16,      // Apogee Continuity Sense
-    sense_m: i16,      // Main Continuity Sense
-    pres: i32,         // Pressure Sensor (Pa * 10)
-    temp: i16,         // Temperature Sensor (°C * 100)
-    acceleration: i16, // m/s^2 * 16
-    speed: i16,        // m/s * 16
-    height: i16,       // m
-    ground_pres: i32,  // Average Barometer Reading on Ground
-                       // 4 bytes of padding
 }
 
 impl PayloadDecode for MiniSensor {
@@ -528,21 +474,6 @@ impl PayloadDecode for MiniSensor {
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct Config {
-    dev_type: u8,        // Device Type
-    flight: u16,         // Flight Number
-    config_major: u8,    // Config Major Version
-    config_minor: u8,    // Config Minor Version
-    apogee_delay: u16,   // Apogee Deploy Delay (seconds)
-    main_deploy: u16,    // Main Deploy Alt (meters)
-    flight_log_max: u16, // Maximum Flight Log Size (kB)
-    callsign: [u8; 8],   // Radio Operator Identifier (chars)
-    version: [u8; 8],    // Software Version Identifier (chars)
-                         // C++'s characters are 1 byte while Rust's are 4
-                         // Using u8 since it's 1 byte to get around this
-}
-
 impl PayloadDecode for Config {
     fn decode(_type_id: u8, raw: &[u8; PAYLOAD_LEN]) -> Result<Self, DecodeError> {
         let mut c = Cursor::new(raw);
@@ -563,14 +494,6 @@ impl PayloadDecode for Config {
 
         Ok(resp)
     }
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct Companion {
-    board_id: u8,              // Type of Companion Board Attached
-    update_period: u8,         // How often Telemetry is sent (1/100ths of a second)
-    channels: u8,              // Number of Data Channels Supplied
-    companion_data: [u16; 12], // Up to 12 channels of 16-bit Companion Data
 }
 
 impl PayloadDecode for Companion {
@@ -616,13 +539,31 @@ impl fmt::Display for DecodeError {
         match self {
             DecodeError::BadPrefix => write!(f, "Telemetry Line doesn't start with \"TELEM\""),
             DecodeError::BadHex => write!(f, "Telemetry Line include invalid HEX data"),
-            DecodeError::BadLength { expected, got} => write!(f, "Invalid Line length, Expected {} but got {}.", expected, got),
-            DecodeError::BadChecksum { expected, got } => write!(f, "Checksum did not match, Expected {} but got {}", expected, got),
+            DecodeError::BadLength { expected, got } => write!(
+                f,
+                "Invalid Line length, Expected {} but got {}.",
+                expected, got
+            ),
+            DecodeError::BadChecksum { expected, got } => write!(
+                f,
+                "Checksum did not match, Expected {} but got {}",
+                expected, got
+            ),
             DecodeError::CrcFailed => write!(f, "Bit 7 of LQI was off, CRC is incorrect"),
             DecodeError::Truncated => write!(f, "Not enough provided data for the given type"),
-            DecodeError::BadPacketLength => write!(f, "Invalid packet length, correct length is {} bytes", PACKET_LEN),
-            DecodeError::BadPayloadLength => write!(f, "Invalid payload length, correct length is {} bytes", PAYLOAD_LEN),
-            DecodeError::ConversionError => write!(f, "Error converting data types when verifying checksum"),
+            DecodeError::BadPacketLength => write!(
+                f,
+                "Invalid packet length, correct length is {} bytes",
+                PACKET_LEN
+            ),
+            DecodeError::BadPayloadLength => write!(
+                f,
+                "Invalid payload length, correct length is {} bytes",
+                PAYLOAD_LEN
+            ),
+            DecodeError::ConversionError => {
+                write!(f, "Error converting data types when verifying checksum")
+            }
             DecodeError::InvalidTypeId => write!(f, "Given data type ID does not exist"),
         }
     }
@@ -630,6 +571,7 @@ impl fmt::Display for DecodeError {
 
 // line -> framing check -> header + payload bytes -> typed payload
 // The only function that should be called from outside this file
+#[tauri::command]
 pub fn parse_line(line: &str) -> Result<Telemetry, DecodeError> {
     let start = "TELEM ";
     let line = line
@@ -694,6 +636,11 @@ fn verify_frame(bytes: &[u8]) -> Result<([u8; PACKET_LEN], LinkInfo), DecodeErro
     let lqi = bytes[act_len - 2]; // 1 for checksum & one for going from 1 based to 0 based
     let rssi = bytes[act_len - 3] as i8;
     let crc_ok = lqi & (1 << 7) != 0; // If the 8th bit (bit 7) is on (AND with 1000 0000)
+
+    // println!("Full Line: {:?}", bytes);
+    // println!("LQI: {}", lqi);
+    // println!("RSSI: {}", rssi);
+    // println!("CRC OK: {}", crc_ok);
 
     if !crc_ok {
         return Err(DecodeError::CrcFailed);
@@ -1651,5 +1598,27 @@ mod tests {
             1,
             "expected a single transmitting device in this capture"
         );
+    }
+
+    #[test]
+    fn build_snapshots_counts_lines() {
+        let lines = vec![
+            "TELEM 22fe3f1b0805ff7b033d788112c4024bc21a061300192f09040801030000007d00d091c9"
+                .to_string(), // GPS: decodes, emits no snapshot
+            "TELEM zz".to_string(), // bad hex
+            String::new(),          // blank lines aren't counted
+        ];
+        let (snaps, stats) = build_snapshots(lines);
+        assert!(snaps.is_empty());
+        assert_eq!((stats.lines, stats.ok, stats.other_errors), (2, 1, 1));
+    }
+
+    #[test]
+    fn tick_clock_handles_wrap_and_late_packets() {
+        let mut c = TickClock::default();
+        assert_eq!(c.unwrap_ms(65530), 655_300);
+        assert_eq!(c.unwrap_ms(2), 655_380);     // wrapped
+        assert_eq!(c.unwrap_ms(65533), 655_330); // late packet from before the wrap
+        assert_eq!(c.unwrap_ms(10), 655_460);    // and no double count afterwards
     }
 }

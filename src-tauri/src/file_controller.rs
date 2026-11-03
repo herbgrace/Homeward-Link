@@ -1,4 +1,5 @@
 use crate::{state_controller, telem_decoder};
+use crate::telem_models::{LoadStats, Snapshot};
 
 use csv::StringRecord;
 use std::{fs, io::BufReader, io::BufRead, path::Path };
@@ -8,14 +9,14 @@ use serde::Serialize;
 #[serde(tag = "kind", content = "data", rename_all = "camelCase")]
 pub enum FlightData {
     Table(Vec<Vec<String>>),
-    Telemetry { packets: Vec<telem_decoder::Telemetry>, skipped: usize },
+    Telemetry { snapshots: Vec<Snapshot>, stats: LoadStats },
 }
 
 impl FlightData {
     fn len(&self) -> usize {
         match self {
             FlightData::Table(vec) => vec.len(),
-            FlightData::Telemetry { packets, .. } => packets.len() 
+            FlightData::Telemetry { snapshots: packets, .. } => packets.len() 
         }
     }
 }
@@ -92,24 +93,29 @@ async fn load_all_csv_data(path: String) -> Result<Vec<Vec<String>>, String> {
         Ok(records)
 }
 
-async fn load_all_telem_data(path: String) -> Result<FlightData, String> {
+fn read_telem_snapshots(path: &str) -> Result<(Vec<Snapshot>, LoadStats), String> {
     let file = fs::File::open(path).map_err(|e| e.to_string())?;
-    let reader = BufReader::new(file);
 
-    let mut resp: Vec<telem_decoder::Telemetry> = Vec::new();
-    let mut skipped: usize = 0;
-
-    for line in reader.lines() {
-        let Ok(line) = line else { skipped += 1; continue };
-        if line.trim().is_empty() { continue; }
-
-        match telem_decoder::parse_line(&line) {
-            Ok(t) => resp.push(t),
-            Err(_) => skipped += 1,
+    // Stop at the first unreadable line instead of looping on a persistent I/O error.
+    let mut read_error: Option<String> = None;
+    let lines = BufReader::new(file).lines().map_while(|l| match l {
+        Ok(line) => Some(line),
+        Err(e) => {
+            read_error = Some(e.to_string());
+            None
         }
+    });
+
+    let result = telem_decoder::build_snapshots(lines);
+    match read_error {
+        Some(e) => Err(format!("Failed reading telemetry file: {e}")),
+        None => Ok(result),
     }
-    
-    Ok(FlightData::Telemetry { packets: resp, skipped: skipped })
+}
+
+async fn load_all_telem_data(path: String) -> Result<FlightData, String> {
+    let (snapshots, stats) = read_telem_snapshots(&path)?;
+    Ok(FlightData::Telemetry { snapshots, stats })
 }
 
 // u16 allows for max flight lengths of ~76 days, which should be plenty
@@ -135,7 +141,6 @@ pub async fn load_flight_block(state: tauri::State<'_, state_controller::AppStat
     
     Ok(data)
 }
-
 
 async fn load_csv_block(state: &tauri::State<'_, state_controller::AppState>, path: String) -> Result<Vec<Vec<String>>, String> {
     let mut reader = csv::ReaderBuilder::new()
@@ -173,27 +178,18 @@ async fn load_csv_block(state: &tauri::State<'_, state_controller::AppState>, pa
 }
 
 async fn load_telem_block(state: &tauri::State<'_, state_controller::AppState>, path: String) -> Result<FlightData, String> {
-    let block = state_controller::get_current_block(&state)?;
-    let block_size: u16 = state_controller::get_block_size(state.clone())?;
+    let block = state_controller::get_current_block(state)? as usize;
+    let block_size = state_controller::get_block_size(state.clone())? as usize;
 
-    let file = fs::File::open(path).map_err(|e| e.to_string())?;
-    let lines = BufReader::new(file).lines()
-        .skip(block as usize * block_size as usize)
-        .take(block_size as usize);
+    // Paging counts valid snapshots, not raw lines, so corrupt lines never eat into a block.
+    let (snapshots, stats) = read_telem_snapshots(&path)?;
+    let page: Vec<Snapshot> = snapshots
+        .into_iter()
+        .skip(block * block_size)
+        .take(block_size)
+        .collect();
 
-    let mut resp: Vec<telem_decoder::Telemetry> = Vec::new();
-    let mut skipped = 0;
-    for line in lines {
-        let Ok(line) = line else { skipped += 1; continue };
-        if line.trim().is_empty() { continue; }
-
-        match telem_decoder::parse_line(&line) {
-            Ok(t) => resp.push(t),
-            Err(_) => skipped += 1,
-        }
-    }
-    
-    Ok(FlightData::Telemetry { packets: resp, skipped: skipped })
+    Ok(FlightData::Telemetry { snapshots: page, stats })
 }
 
 // TODO - Fix unit test that were broken by refactor
