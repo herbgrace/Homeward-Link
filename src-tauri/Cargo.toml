@@ -1,6 +1,6 @@
 [package]
 name = "homeward-link"
-version = "1.0.0-beta1"
+version = "1.0.0-beta.1"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
