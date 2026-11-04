@@ -44,14 +44,58 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Install Linux dependencies (Ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
+      - name: install system dependencies (Linux only)
+        if: matrix.platform == 'ubuntu-latest' # Adjust this to match your matrix or setup
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y libudev-dev libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Install frontend dependencies
         run: npm ci # Change to 'yarn install' or 'pnpm install' if needed
+
+      - name: Strip pre-release tag for Windows MSI
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            
+            // Clean tauri.conf.json
+            const tauriPath = "src-tauri/tauri.conf.json";
+            if (fs.existsSync(tauriPath)) {
+              const config = JSON.parse(fs.readFileSync(tauriPath, "utf8"));
+              if (config.version && config.version.includes("-")) {
+                config.version = config.version.split("-")[0];
+                fs.writeFileSync(tauriPath, JSON.stringify(config, null, 2));
+                console.log("Updated tauri.conf.json version to:", config.version);
+              }
+            }
+
+            // Clean package.json (if present)
+            const pkgPath = "package.json";
+            if (fs.existsSync(pkgPath)) {
+              const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+              if (pkg.version && pkg.version.includes("-")) {
+                pkg.version = pkg.version.split("-")[0];
+                fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+                console.log("Updated package.json version to:", pkg.version);
+              }
+            }
+
+            // Clean Cargo.toml (if Tauri v1/v2 pulls version from there)
+            const cargoPath = "src-tauri/Cargo.toml";
+            if (fs.existsSync(cargoPath)) {
+              let cargo = fs.readFileSync(cargoPath, "utf8");
+              // Matches version = "1.0.0-beta" under [package]
+              const match = cargo.match(/^version\s*=\s*"([^"]+)"/m);
+              if (match && match[1].includes("-")) {
+                const cleanVersion = match[1].split("-")[0];
+                cargo = cargo.replace(match[0], `version = "${cleanVersion}"`);
+                fs.writeFileSync(cargoPath, cargo, "utf8");
+                console.log("Updated Cargo.toml version to:", cleanVersion);
+              }
+            }
+          '
 
       - name: Build and Release
         uses: tauri-apps/tauri-action@v1
