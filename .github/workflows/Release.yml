@@ -2,6 +2,8 @@ name: Release App
 
 on:
   push:
+    branches:
+      - 'master'
     tags:
       - 'v*' # Triggers the workflow only when you push a version tag like v1.0.0
 
