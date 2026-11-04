@@ -45,7 +45,7 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: install system dependencies (Linux only)
-        if: matrix.platform == 'ubuntu-latest' # Adjust this to match your matrix or setup
+        if: matrix.platform == 'ubuntu-22.04' # Adjust this to match your matrix or setup
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -53,7 +53,8 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
-            patchelf
+            patchelf \
+            libudev-dev
 
       - name: Install frontend dependencies
         run: npm ci # Change to 'yarn install' or 'pnpm install' if needed
