@@ -1,124 +1,73 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { FlightData } from "./telemetryDisplay";
+import { csvToFrames, snapshotToFrame, type Frame } from "./frames";
 
 let filePath: string = $state('');
 
-let firstBlock: string[][] = $state([]);
-let secondBlock: string[][] = $state([]);
-let usingFirst: boolean = $state(false); 
-
-let headers: string[] = $state([]);
-let timeIndex: number = $state(-1);
-let usingSeconds: boolean = $state(false);
-let rollIndex: number = $state(-1);
-let pitchIndex: number = $state(-1);
-let yawIndex: number = $state(-1);
+let firstBlock: Frame[] = $state([]);
+let secondBlock: Frame[] = $state([]);
+let usingFirst: boolean = $state(false);
 
 let displayedLineIndex = $state(0);
 let block_size = $derived(get_current_block().length - 1)
 let linesUntilRefresh = $derived(
-    block_size >= 0 ?
-    Math.floor(block_size * 0.9) :
-    0
+    block_size >= 0 ? Math.floor(block_size * 0.9) : 0
 )
 
 let reachedEnd: boolean = $derived(
-    // Block Size has initialized correctly
     (block_size) >= 0 &&
-    // End of the current block
     (displayedLineIndex >= block_size) &&
-    // Next block has no data
     (usingFirst ? secondBlock.length == 0 : firstBlock.length == 0)
 );
 
-type RocketRotation = [roll: number, pitch: number, yaw: number]
-
 export async function init_manager(path: string) {
+    reset_manager();           // clears blocks + the tick clock from any previous file
     filePath = path;
     await load_new_block();
     usingFirst = !usingFirst;
-    find_indices();
 }
 
-function find_indices() {
-    // TODO - add functionality to let users pick which headers do what instead of hardcoding
-    const SECOND_HEADERS = ["unixtime", "relseconds"];
-    const MS_HEADERS = ["relms", "currenttimemillis", "unixms"]
-    const ROLL_HEADERS = ["roll", "x"]
-    const PITCH_HEADERS = ["pitch", "y"]
-    const YAW_HEADERS = ["yaw", "z"]
-
-    get_headers().forEach((header, index) => {
-        header = header.toLowerCase()
-
-        // Would using a switch statement be cleaner/more readable?
-        if (SECOND_HEADERS.includes(header)) {
-            timeIndex = index;
-            usingSeconds = true;
-        } else if (MS_HEADERS.includes(header)) {
-            timeIndex = index;
-            usingSeconds = false;
-        } else if (ROLL_HEADERS.includes(header)) {
-            rollIndex = index;
-        } else if (PITCH_HEADERS.includes(header)) {
-            pitchIndex = index;
-        } else if (YAW_HEADERS.includes(header)) {
-            yawIndex = index;
-        }
-    })
-}
-
-export async function reset_manager() {
-    filePath = ''
-    timeIndex = -1;
-    rollIndex = -1;
-    pitchIndex = -1;
-    yawIndex = -1;
+export function reset_manager() {
+    filePath = '';
+    firstBlock = [];
+    secondBlock = [];
     usingFirst = false;
     displayedLineIndex = 0;
 }
 
-export function get_headers(): string[] {
-    return headers;
-}
-
-function get_current_block(): string[][] {
+function get_current_block(): Frame[] {
     return usingFirst ? firstBlock : secondBlock;
 }
 
-export function get_current_line(): string[] {
+export function get_current_frame(): Frame | undefined {
     return get_current_block()[displayedLineIndex];
 }
 
-function get_next_line(): string[] {
-    if (reachedEnd) {
-        return [];
-    }
+function get_next_frame(): Frame | undefined {
+    if (reachedEnd) return undefined;
     if (displayedLineIndex == block_size) {
-        return usingFirst ? secondBlock[0] : firstBlock[0];
+        return (usingFirst ? secondBlock : firstBlock)[0];
     }
-
     return get_current_block()[displayedLineIndex + 1];
 }
 
-export function get_current_line_and_increment(): string[] {
-    let line = get_current_line();
+export function get_current_frame_and_increment(): Frame | undefined {
+    const frame = get_current_frame();
     increment_counter();
-    return line;
+    return frame;
 }
 
-export function get_next_line_and_increment(): string[] {
-    let line = get_next_line();
+export function get_next_frame_and_increment(): Frame | undefined {
+    const frame = get_next_frame();
     increment_counter();
-    return line;
+    console.log("Getting the next frame and incrementing!");
+    return frame;
 }
 
 function increment_counter() {
-    // console.log("Current Index: " + displayedLineIndex);
-    // console.log("Lines Until Refresh : " + linesUntilRefresh);
     if (displayedLineIndex == linesUntilRefresh) {
         load_new_block();
     }
-
     if (displayedLineIndex == block_size) {
         usingFirst = !usingFirst;
         displayedLineIndex = 0;
@@ -127,43 +76,34 @@ function increment_counter() {
     }
 }
 
+const MAX_WAIT_MS = 10_000;
+const DEFAULT_WAIT_MS = 100;
 export function determine_waiting_period(): number {
-    // TODO - determine what other headers contain valid time data
-    // TODO - find a better way to do this rather than manually listing valid headers
-    const DEFAULT_WAIT = 100;
-
-    if (timeIndex == -1) {
-        return DEFAULT_WAIT;
-    }
-
-    let firstLine = get_current_line();
-    let secondLine = get_next_line();
-
-    let difference = Number(secondLine[timeIndex]) - Number(firstLine[timeIndex]);
-    return usingSeconds ? difference * 1000 : difference;
-}
-
-export function get_rotation(): RocketRotation {
-    let resp: RocketRotation = [0, 0 ,0];
-    let line: string[] = get_current_line();
-
-    if (rollIndex != -1) {resp[0] = Number(line[rollIndex])}
-    if (pitchIndex != -1) {resp[1] = Number(line[pitchIndex])}
-    if (yawIndex != -1) {resp[2] = Number(line[yawIndex])}
-
-    return resp;
+    const cur = get_current_frame(), next = get_next_frame();
+    if (cur?.timeMs == null || next?.timeMs == null) return DEFAULT_WAIT_MS;
+    const diff = next.timeMs - cur.timeMs;
+    
+    return diff < 0 ? 100 : Math.min(diff, MAX_WAIT_MS);
 }
 
 async function load_new_block() {
-    console.log("Loading a new block!");
-    // Block will always have headers in the 0th index,
-    // The rest of the data will occupy the rest of the space
-    let loadedBlock = await invoke<string[][]>('load_flight_block', {filePath: filePath});
-    headers = loadedBlock[0];
-    // A bit counter-intuitive, but we want to avoid updating the data we're currently displaying
-    if (usingFirst) {
-        secondBlock = loadedBlock.slice(1);
+    // Pick the target buffer BEFORE awaiting. usingFirst can flip while the
+    // request is in flight, which would write the block over the one on screen.
+    const loadIntoFirst = !usingFirst;
+
+    const res = await invoke<FlightData>('load_flight_block', { filePath });
+
+    console.log(res);
+
+    let frames: Frame[];
+    if (res.kind === 'table') {
+        const [headers = [], ...rows] = res.data;       // row 0 of every block is the header
+        frames = csvToFrames(headers, rows);
     } else {
-        firstBlock = loadedBlock.slice(1);
+        frames = res.data.snapshots.map(snapshotToFrame);
     }
+
+    console.log(frames);
+
+    if (loadIntoFirst) firstBlock = frames; else secondBlock = frames;
 }

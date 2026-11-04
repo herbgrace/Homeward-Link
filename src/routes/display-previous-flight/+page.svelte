@@ -5,27 +5,25 @@ import { onMount, onDestroy } from "svelte";
 import {    
     init_manager, 
     reset_manager, 
-    get_current_line, 
-    get_headers,
-    determine_waiting_period, 
-    get_next_line_and_increment
+    determine_waiting_period,
+    get_current_frame_and_increment,
+    get_next_frame_and_increment,
 } from "$lib/utils/blockManager.svelte"
 
 import FlightDisplayer from "$lib/components/FlightDisplayer.svelte";
+import type { Frame } from "$lib/utils/frames";
 
 let filePath: string = $state(page.url.searchParams.get('filePath') || "");
 let isLoading: boolean = $state(true);
 let isPlaying: boolean = $state(false);
 
-let headers: string[] = $state([]);
-let displayLine: string[] = $state([]);
+let frame: Frame | undefined = $state(undefined);
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 onMount(async () => {
     await init_manager(filePath);
-    headers = get_headers();
-    displayLine = get_current_line();
+    frame = get_current_frame_and_increment();
     isLoading = false;
 });
 
@@ -39,16 +37,15 @@ async function start_replay() {
         return;
     }
     isPlaying = true;
-    while (displayLine.length != 0 && isPlaying) {
+    while (frame != undefined && isPlaying) {
         await wait(determine_waiting_period())
-        displayLine = get_next_line_and_increment();
+        frame = get_next_frame_and_increment();
     }
 }
 
 async function stop_replay() {
     isPlaying = false;
 }
-
 </script>
 
 
@@ -58,8 +55,7 @@ async function stop_replay() {
     {:else}
         <FlightDisplayer 
             dataUrl={filePath}
-            headers={headers}
-            displayLine={displayLine}
+            frame={frame}
             isLive={false}
             isPlaying={isPlaying}
             startReplayMethod={start_replay}

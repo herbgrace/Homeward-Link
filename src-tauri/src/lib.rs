@@ -3,6 +3,7 @@ mod config_controller;
 mod file_controller;
 mod usb_reader;
 mod telem_decoder;
+mod telem_models;
 
 use core::error;
 use tauri::{Manager};
@@ -23,7 +24,7 @@ pub fn run() {
             file_controller::load_all_flight_data,
             file_controller::load_flight_block,
             usb_reader::start_serial,
-            usb_reader::stop_serial
+            usb_reader::stop_serial,
             ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
