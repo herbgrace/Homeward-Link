@@ -11,6 +11,11 @@ pub struct FlightState {
     pub gps: Option<Location>,
     pub sats: Option<Satellites>,
     pub config: Option<Config>,
+    pub sensor: Option<Sensor>,
+    pub comp: Option<Companion>,
+    pub mini: Option<MiniSensor>,
+    pub metrum_sens: Option<MetrumSensor>,
+    pub calib: Option<MetrumCalibration>,
 }
 
 /// One merged row of flight data, emitted per IMU/Kalman packet.

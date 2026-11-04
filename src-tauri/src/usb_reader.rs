@@ -9,11 +9,22 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
 
+use crate::telem_decoder::{Accumulator, DecodeError};
+use crate::telem_models::Snapshot;
+
 // ---------- Data types ----------
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind", content = "data", rename_all = "camelCase")]
+pub enum LiveTelemetry {
+    #[serde(rename = "esp")]
+    ESP(ESPData),
+    TeleDongle(Snapshot)
+}
 
 #[derive(Debug, Default, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Telemetry {
+pub struct ESPData {
     pub accel_x: f32,
     pub accel_y: f32,
     pub accel_z: f32,
@@ -21,6 +32,22 @@ pub struct Telemetry {
     pub rot_y: f32,
     pub rot_z: f32,
     pub temperature: f32,
+}
+
+type Decoder = Box<dyn FnMut(&str) -> Option<LiveTelemetry>>;
+
+fn esp32_decoder() -> Decoder {
+    Box::new(parse_esp32)   // your existing fn(&str) -> Option<LiveTelemetry>
+}
+
+fn teledongle_decoder() -> Decoder {
+    let mut acc = Accumulator::default();   // fresh state per connection
+    Box::new(move |line| match acc.push_line(line) {
+        Ok(Some(snap)) => Some(LiveTelemetry::TeleDongle(snap)),
+        Ok(None) => None,   // GPS/satellite/config packet: merged, nothing to show yet
+        Err(DecodeError::BadPrefix | DecodeError::CrcFailed) => None,   // dongle chatter or corrupt packet
+        Err(e) => { eprintln!("TELEM decode error: {e}"); None }
+    })
 }
 
 #[derive(Clone, Serialize)]
@@ -31,8 +58,8 @@ struct Status {
 }
 
 /// "Acceleration X: 5.00 | Acceleration Y: 1.45 | ... | Temperature: 27.84"
-fn parse_esp32(line: &str) -> Option<Telemetry> {
-    let mut t = Telemetry::default();
+fn parse_esp32(line: &str) -> Option<LiveTelemetry> {
+    let mut t = ESPData::default();
     let mut seen: HashSet<&str> = HashSet::new();
 
     for part in line.split('|') {
@@ -61,8 +88,9 @@ fn parse_esp32(line: &str) -> Option<Telemetry> {
         }
     }
     // Only accept lines containing all 7 fields (rejects boot noise / partial lines)
-    (seen.len() == 7).then_some(t)
+    (seen.len() == 7).then_some(LiveTelemetry::ESP(t))
 }
+
 
 // ---------- Device profiles ----------
 
@@ -71,7 +99,8 @@ struct DeviceProfile {
     matches: fn(&UsbPortInfo) -> bool,
     baud: u32,
     init: Option<&'static [u8]>,
-    parse: Option<fn(&str) -> Option<Telemetry>>,
+    decoder: fn() -> Decoder,
+    altos: bool,
 }
 
 fn product_contains(info: &UsbPortInfo, needle: &str) -> bool {
@@ -91,14 +120,16 @@ const PROFILES: &[DeviceProfile] = &[
         },
         baud: 115_200,
         init: None,
-        parse: Some(parse_esp32),
+        decoder: esp32_decoder,
+        altos: false,
     },
     DeviceProfile {
         name: "TeleDongle",
         matches: |i| product_contains(i, "teledongle") || (i.vid == 0xFFFE && i.pid == 0x000C),
         baud: 115_200,
         init: None,  // fill in once you've confirmed the monitor command
-        parse: None, // raw lines only until you write a TeleDongle parser
+        decoder: teledongle_decoder, 
+        altos: true
     },
 ];
 
@@ -135,9 +166,10 @@ fn run_session(
     port_name: &str,
     profile: &DeviceProfile,
 ) -> Result<(), Box<dyn Error>> {
+
     let mut port = serialport::new(port_name, profile.baud)
-        .timeout(READ_TIMEOUT)
-        .open()?;
+    .timeout(READ_TIMEOUT)
+    .open()?;
 
     if let Some(cmd) = profile.init {
         port.write_all(cmd)?;
@@ -149,6 +181,9 @@ fn run_session(
     // survive read timeouts.
     let mut buf = Vec::new();
 
+    let mut altos = Accumulator::default();
+    let mut decode = (profile.decoder)();
+
     while !stop.load(Ordering::Relaxed) {
         match reader.read_until(b'\n', &mut buf) {
             Ok(0) => return Err("port closed".into()),
@@ -157,14 +192,22 @@ fn run_session(
                 buf.clear();
 
                 let _ = app.emit("serial-line", &line);
-                if let Some(parse) = profile.parse {
-                    if let Some(t) = parse(&line) {
-                        let _ = app.emit("telemetry", &t);
+
+                if let Some(t) = decode(&line) {
+                    let _ = app.emit("telemetry", &t);
+                }
+
+                if profile.altos {
+                    match altos.push_line(&line) {
+                        Ok(Some(snap)) => { let _ = app.emit("flight-snapshot", &snap); }
+                        Ok(None) => {} // GPS/satellite/config packet: merged, nothing to emit yet
+                        Err(DecodeError::BadPrefix | DecodeError::CrcFailed) => {} // dongle chatter or a corrupt packet
+                        Err(e) => eprintln!("TELEM decode error: {e}"),
                     }
                 }
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => continue,
-            Err(e) => return Err(e.into()), // unplugged, etc.
+            Err(e) => return Err(e.into()),
         }
     }
     Ok(())
@@ -255,11 +298,17 @@ mod tests {
     }
 
     #[test]
-    fn parses_a_complete_line() {
+    fn parses_a_complete_line() -> Result<(), &'static str> {
         let t = parse_esp32(FULL).unwrap();
-        assert_eq!((t.accel_x, t.accel_y, t.accel_z), (5.0, 1.45, -9.81));
-        assert_eq!((t.rot_x, t.rot_y, t.rot_z), (0.1, -0.2, 0.3));
-        assert_eq!(t.temperature, 27.84);
+        assert!(matches!(t, LiveTelemetry::ESP(_)));
+        if let LiveTelemetry::ESP(t) = t {
+            assert_eq!((t.accel_x, t.accel_y, t.accel_z), (5.0, 1.45, -9.81));
+            assert_eq!((t.rot_x, t.rot_y, t.rot_z), (0.1, -0.2, 0.3));
+            assert_eq!(t.temperature, 27.84);
+            Ok(())
+        } else {
+            Err("ESP32 data came back as the wrong type")
+        }
     }
 
     #[test]

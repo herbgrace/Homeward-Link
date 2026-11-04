@@ -25,7 +25,6 @@ pub fn run() {
             file_controller::load_flight_block,
             usb_reader::start_serial,
             usb_reader::stop_serial,
-            telem_decoder::parse_line,
             ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

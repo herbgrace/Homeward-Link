@@ -43,3 +43,24 @@ export interface LoadStats { lines: number; ok: number; crcFailed: number; other
 export type FlightData =
     | { kind: "table"; data: string[][] }
     | { kind: "telemetry"; data: { snapshots: Snapshot[]; stats: LoadStats } };
+
+export interface EspData {
+    accelX: number; accelY: number; accelZ: number;
+    rotX: number; rotY: number; rotZ: number;
+    temperature: number;
+}
+
+// Single source of truth for order, labels, and formatting
+export const live_columns: { key: keyof EspData; label: string; decimals: number }[] = [
+    { key: "accelX",      label: "Acceleration X", decimals: 2 },
+    { key: "accelY",      label: "Acceleration Y", decimals: 2 },
+    { key: "accelZ",      label: "Acceleration Z", decimals: 2 },
+    { key: "rotX",        label: "Rotation X",     decimals: 2 },
+    { key: "rotY",        label: "Rotation Y",     decimals: 2 },
+    { key: "rotZ",        label: "Rotation Z",     decimals: 2 },
+    { key: "temperature", label: "Temperature",    decimals: 2 },
+];
+
+export type LiveTelemetry =
+    | { kind: "esp"; data: EspData }
+    | { kind: "teleDongle"; data: Snapshot };

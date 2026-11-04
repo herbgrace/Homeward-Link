@@ -2,33 +2,37 @@
 import NavigationBar from '$lib/components/NavigationBar.svelte';
 import FlightDisplayer from '$lib/components/FlightDisplayer.svelte';
 
-import { onDestroy, onMount } from 'svelte';
+import { onMount } from 'svelte';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { liveTelemetryToFrames, type Frame, type LiveTelemetry, type Status} from '$lib/utils/frames';
+import { liveToFrame, type Frame } from '$lib/utils/frames';
+import type { Snapshot, LiveTelemetry } from "$lib/utils/telemetryDisplay";
 
-
-
-let telemetry = $state<LiveTelemetry | null>(null);
-let status = $state<Status>({ connected: false });
 let running = $state(false);
 let frame: Frame | undefined = $state(undefined);
 
 
-onMount(() => {
-    // listen() returns a Promise<UnlistenFn>; keep the promises so cleanup
-    // works even if the component is destroyed before they resolve.
-    const unlisteners = [
-        listen<LiveTelemetry>("telemetry", (e) => (frame = liveTelemetryToFrames(e.payload))),
-        listen<Status>("serial-status", (e) => (status = e.payload)),
-    ];
-
-    return () => {
-        unlisteners.forEach((p) => p.then((unlisten) => unlisten()));
-        // Optional: stop the backend when leaving this page/component
-        invoke("stop_serial");
-    };
+$effect(() => {
+    const unlisten = listen<LiveTelemetry>("telemetry", (e) => {
+        frame = liveToFrame(e.payload);
+    });
+    return () => { unlisten.then((f) => f()); };   // clean up on unmount
 });
+
+// onMount(() => {
+//     // listen() returns a Promise<UnlistenFn>; keep the promises so cleanup
+//     // works even if the component is destroyed before they resolve.
+//     const unlisteners = [
+//         listen<Snapshot>("flight-snapshot", (e) => { frame = snapshotToFrame(e.payload); }),
+//         listen<LiveTelemetry>("telemetry", (e) => { frame = liveESPToFrames(e.payload); }),
+//     ];
+
+//     return () => {
+//         unlisteners.forEach((p) => p.then((unlisten) => unlisten()));
+//         // Optional: stop the backend when leaving this page/component
+//         invoke("stop_serial");
+//     };
+// });
 
 async function startReplay() {
     await invoke("start_serial");

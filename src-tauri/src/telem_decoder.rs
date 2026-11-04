@@ -17,7 +17,7 @@ const PAD_LEAD_S: f64 = 0.0;
 
 /// Unwraps the 16-bit, 1/100 s tick counter (wraps every ~655 s) into a continuous clock.
 #[derive(Default)]
-struct TickClock {
+pub struct TickClock {
     last: Option<u64>,
 }
 
@@ -38,15 +38,23 @@ impl TickClock {
 
 /// Merges packets into a running FlightState.
 #[derive(Default)]
-struct Accumulator {
-    latest: FlightState,
-    clock: TickClock,
+pub struct Accumulator {
+    pub latest: FlightState,
+    pub clock: TickClock,
+    pub first_ms: Option<u64>,
+    pub boost_ms: Option<u64>,
 }
 
 impl Accumulator {
-    /// Returns a snapshot for IMU and Kalman packets, which is what AltOS' CSV rows appear to be.
-    fn push(&mut self, t: &Telemetry) -> Option<Snapshot> {
+    /// Live entry point: one raw serial line in, maybe one merged snapshot out.
+    pub fn push_line(&mut self, line: &str) -> Result<Option<Snapshot>, DecodeError> {
+        Ok(self.push(&parse_line(line)?))
+    }
+
+    /// Returns a snapshot all applicable TeleDongle Packet Types 
+    pub fn push(&mut self, t: &Telemetry) -> Option<Snapshot> {
         let uptime_ms = self.clock.unwrap_ms(t.header.tick);
+        let first_ms = *self.first_ms.get_or_insert(uptime_ms);
 
         let emit = match &t.payload {
             Payload::MegaImu(m) => {
@@ -55,6 +63,22 @@ impl Accumulator {
             }
             Payload::MegaKalman(k) => {
                 self.latest.kalman = Some(k.clone());
+                true
+            }
+            Payload::Sensor(s) => {
+                self.latest.sensor = Some(s.clone());
+                true
+            }
+            Payload::Companion(c) => {
+                self.latest.comp = Some(c.clone());
+                true
+            }
+            Payload::MiniSensor(m) => {
+                self.latest.mini = Some(m.clone());
+                true
+            }
+            Payload::MetrumSensor(s) => {
+                self.latest.metrum_sens = Some(s.clone());
                 true
             }
             Payload::Location(l) => {
@@ -69,19 +93,32 @@ impl Accumulator {
                 self.latest.config = Some(c.clone());
                 false
             }
-            _ => false, // add arms for TeleMetrum/TeleMini payloads as needed
+            Payload::MetrumCalibration(c) => {
+                self.latest.calib = Some(c.clone());
+                false
+            }
+
+            _ => false,
         };
+
+        // Live time axis: counts up from the first packet until boost, then restarts at 0
+        if self.boost_ms.is_none()
+            && self.latest.kalman.as_ref().map_or(false, |k| k.state >= STATE_BOOST)
+        {
+            self.boost_ms = Some(uptime_ms);
+        }
+        let t0 = self.boost_ms.unwrap_or(first_ms);
 
         emit.then(|| Snapshot {
             uptime_ms,
-            time_s: 0.0, // filled in by set_relative_times once the whole file is known
+            time_s: (uptime_ms as f64 - t0 as f64) / 1000.0,
             link: t.link,
             latest: self.latest.clone(),
         })
     }
 }
 
-/// Decode raw TELEM lines into merged snapshots. Pure: no file access.
+/// Decode raw TELEM lines into merged snapshots.
 pub fn build_snapshots<I>(lines: I) -> (Vec<Snapshot>, LoadStats)
 where
     I: IntoIterator<Item = String>,
@@ -570,8 +607,6 @@ impl fmt::Display for DecodeError {
 }
 
 // line -> framing check -> header + payload bytes -> typed payload
-// The only function that should be called from outside this file
-#[tauri::command]
 pub fn parse_line(line: &str) -> Result<Telemetry, DecodeError> {
     let start = "TELEM ";
     let line = line
@@ -637,11 +672,6 @@ fn verify_frame(bytes: &[u8]) -> Result<([u8; PACKET_LEN], LinkInfo), DecodeErro
     let rssi = bytes[act_len - 3] as i8;
     let crc_ok = lqi & (1 << 7) != 0; // If the 8th bit (bit 7) is on (AND with 1000 0000)
 
-    // println!("Full Line: {:?}", bytes);
-    // println!("LQI: {}", lqi);
-    // println!("RSSI: {}", rssi);
-    // println!("CRC OK: {}", crc_ok);
-
     if !crc_ok {
         return Err(DecodeError::CrcFailed);
     }
@@ -688,12 +718,7 @@ fn extract_headers(bytes: &[u8; PACKET_LEN]) -> Result<([u8; PAYLOAD_LEN], Heade
     // Take the byte on the left, shift its bits by 8, then add to byte on the right
 
     let serial = u16::from_le_bytes([bytes[0], bytes[1]]);
-    // let serial = u16::from(bytes[0]) << 8;
-    // let serial =  serial + u16::from(bytes[1]);
-
     let tick = u16::from_le_bytes([bytes[2], bytes[3]]);
-    // let tick = u16::from(bytes[2]) << 8;
-    // let tick = tick + u16::from(bytes[3]);
 
     let telem_type = bytes[4];
 
@@ -712,16 +737,16 @@ fn extract_headers(bytes: &[u8; PACKET_LEN]) -> Result<([u8; PAYLOAD_LEN], Heade
 // Convert the line into its Payload type
 fn decode_payload(type_id: u8, raw: &[u8; PAYLOAD_LEN]) -> Result<Payload, DecodeError> {
     let payload_type = match type_id {
-        0x01 | 0x02 | 0x03 => Payload::Sensor(Sensor::decode(type_id, raw)?),
-        0x04 => Payload::Config(Config::decode(type_id, raw)?),
-        0x05 => Payload::Location(Location::decode(type_id, raw)?),
-        0x06 => Payload::Satellites(Satellites::decode(type_id, raw)?),
-        0x07 => Payload::Companion(Companion::decode(type_id, raw)?),
-        0x08 | 0x12 | 0x13 | 0x14 => Payload::MegaImu(MegaImu::decode(type_id, raw)?),
-        0x09 | 0x15 => Payload::MegaKalman(MegaKalman::decode(type_id, raw)?),
-        0x11 => Payload::MiniSensor(MiniSensor::decode(type_id, raw)?),
-        0x0A => Payload::MetrumSensor(MetrumSensor::decode(type_id, raw)?),
-        0x0B => Payload::MetrumCalibration(MetrumCalibration::decode(type_id, raw)?),
+        0x01 | 0x02 | 0x03           => Payload::Sensor(Sensor::decode(type_id, raw)?),
+        0x04                         => Payload::Config(Config::decode(type_id, raw)?),
+        0x05                         => Payload::Location(Location::decode(type_id, raw)?),
+        0x06                         => Payload::Satellites(Satellites::decode(type_id, raw)?),
+        0x07                         => Payload::Companion(Companion::decode(type_id, raw)?),
+        0x08 | 0x12 | 0x13 | 0x14    => Payload::MegaImu(MegaImu::decode(type_id, raw)?),
+        0x09 | 0x15                  => Payload::MegaKalman(MegaKalman::decode(type_id, raw)?),
+        0x11                         => Payload::MiniSensor(MiniSensor::decode(type_id, raw)?),
+        0x0A                         => Payload::MetrumSensor(MetrumSensor::decode(type_id, raw)?),
+        0x0B                         => Payload::MetrumCalibration(MetrumCalibration::decode(type_id, raw)?),
 
         _ => Payload::Unknown {
             type_id: type_id,
