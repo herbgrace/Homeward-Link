@@ -1,4 +1,7 @@
-export type RocketRotation = [roll: number, pitch: number, yaw: number];
+export type RocketMotion = {
+    rate?: [roll: number, pitch: number, yaw: number]; // Rate of change of degrees / sec
+    tilt?: number; // Degrees from vertical
+};
 
 export interface LinkInfo { rssiDbm: number; lqi: number; crcOk: boolean }
 
