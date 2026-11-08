@@ -1,8 +1,9 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
 import ModelViewer from "$lib/components/ModelViewer.svelte";
-import type { Frame } from "$lib/utils/frames";
-import type { RocketRotation } from "$lib/utils/telemetryDisplay";
+import { type Frame, OrientationTracker } from "$lib/utils/frames";
+import { onDestroy } from "svelte";
+import { toModelPose } from "$lib/utils/modelPose";
 
 interface Props {
     dataUrl?: string,
@@ -25,11 +26,19 @@ let {
 let fileName = $derived(dataUrl?.split(/[\\/]/).at(-1))   // works with / and \ paths
 
 let rocketPath = $state("/models/RussianRocket/RocketTweaked.glb");
-let rotation: RocketRotation = $state([0, 0, 0]);
+let rotation: number[] = $state([0, 0, 0]);
+let modelPose = $derived(toModelPose(rotation));
+
+const tracker = new OrientationTracker();
+
+onDestroy(() => {
+    tracker.reset();
+    rotation = [0, 0, 0];
+})
 
 // Frames without orientation data (e.g. GPS packets) keep the last known pose
 $effect(() => {
-    if (frame?.rotation) rotation = frame.rotation;
+    if (frame) rotation = tracker.update(frame);
 });
 </script>
 
@@ -37,9 +46,10 @@ $effect(() => {
     <div class="sidebar">
         <ModelViewer
             url={rocketPath}
-            rotationX={rotation[0]}
-            rotationY={rotation[1]}
-            rotationZ={rotation[2]}
+            rotationX={modelPose.x}
+            rotationY={modelPose.y}
+            rotationZ={modelPose.z}
+            order={modelPose.order}
             scale={0.25}
         />
     </div>

@@ -9,6 +9,7 @@
     rotationY?: number;
     rotationZ?: number;
     scale?: number;
+    order?: "XYZ" | "XZY" | "YXZ" | "YZX" | "ZXY" | "ZYX";
   }
 
   let { 
@@ -16,7 +17,8 @@
     rotationX = 0, 
     rotationY = 0, 
     rotationZ = 0,
-    scale = 1 
+    scale = 1,
+    order = "XYZ",
   }: Props = $props();
 
   let container: HTMLDivElement;
@@ -25,6 +27,7 @@
   let renderer: THREE.WebGLRenderer;
   let model: THREE.Group | undefined;
   let animationFrameId: number;
+  let pivot: THREE.Group | undefined;
 
   onMount(() => {
     const width = container.clientWidth || 300;
@@ -60,7 +63,13 @@
       (gltf) => {
         model = gltf.scene;
         model.scale.set(scale, scale, scale);
-        scene.add(model);
+        const center = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
+        model.position.sub(center);
+        pivot = new THREE.Group();
+        pivot.add(model);
+        scene.add(pivot);
+        camera.lookAt(0, 0, 0);
+        const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
         updateRotation();
       },
       undefined,
@@ -104,18 +113,16 @@
   // Function to apply rotation changes
   function updateRotation() {
     if (model) {
-      model.rotation.x = rotationX;
-      model.rotation.y = rotationY;
-      model.rotation.z = rotationZ;
+      model.rotation.set(rotationX, rotationY, rotationZ, order)
     }
   }
 
   // React to prop changes from the parent component
   $effect(() => {
-    // console.log("Updating the model's rotation")
     rotationX;
     rotationY;
     rotationZ;
+    order;
     updateRotation();
   });
 </script>

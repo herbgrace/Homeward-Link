@@ -1,4 +1,4 @@
-import type { Snapshot, RocketRotation, EspData, LiveTelemetry} from "./telemetryDisplay";
+import type { Snapshot, RocketMotion, EspData, LiveTelemetry} from "./telemetryDisplay";
 import { live_columns } from "./telemetryDisplay";
 
 const adc = (raw: number) => (raw / 4095) * 3.3;
@@ -7,13 +7,43 @@ const sense12 = (b: number) => (b << 4) | (b >> 4);
 const baroAlt = (pa: number) => 44330.77 * (1 - Math.pow(pa / 101325, 0.190284));
 
 const STATES = ["startup", "idle", "pad", "boost", "fast", "coast", "drogue", "main", "landed", "invalid"];
+const MAX_DT_S = 0.5;   // don't integrate a stale rate across a gap of lost packets
+const ESP_GYRO_IN_RAD = true;   // Adafruit's example prints rad/s
+const GYRO_DPS_PER_LSB = 2000 / 32768;   // from the board's ±2000°/s spec, not checked on your unit
 
 export interface Field { label: string; value: string }
 
 export interface Frame {
     fields: Field[];                 // what the grid displays, in order
     timeMs: number | null;           // for replay timing
-    rotation: RocketRotation | null; // null = this frame has no orientation data
+    rotation: RocketMotion | null; // null = this frame has no orientation data
+}
+
+export class OrientationTracker {
+    private lastMs: number | null = null;
+    private lastRate = [0, 0, 0];   // °/s, held until the next sample
+    private pose = [0, 0, 0];
+
+    reset() { this.lastMs = null; this.lastRate = [0, 0, 0]; this.pose = [0, 0, 0]; }
+
+    update(f: Frame): number[] {
+        const r = f.rotation;
+        if (r) {
+            if (r.rate && f.timeMs != null) {
+                if (this.lastMs != null) {
+                    const dt = Math.min(Math.max((f.timeMs - this.lastMs) / 1000, 0), MAX_DT_S);
+                    const axes = r.tilt != null ? 1 : 3;   // tilt reference => roll only
+                    for (let i = 0; i < axes; i++) {
+                        this.pose[i] = (this.pose[i] + this.lastRate[i] * dt) % 360;
+                    }
+                }
+                this.lastMs = f.timeMs;
+                this.lastRate = r.rate;
+            }
+            if (r.tilt != null) this.pose[1] = r.tilt;
+        }
+        return [...this.pose];
+    }
 }
 
 export interface Status {
@@ -21,7 +51,6 @@ export interface Status {
     device?: string;
     port?: string;
 }
-
 
 const field = (label: string, value: string | number): Field => ({ label, value: String(value) });
 
@@ -43,17 +72,24 @@ export function csvToFrames(headers: string[], rows: string[][]): Frame[] {
     const timeIdx = msIdx !== -1 ? msIdx : secIdx;
     const timeScale = msIdx !== -1 ? 1 : 1000;
 
-    const rotIdx = [find(ROLL_HEADERS), find(PITCH_HEADERS), find(YAW_HEADERS)];
-    const hasRotation = rotIdx.some((i) => i !== -1);
+    const gyroIdx = ["gyro_roll", "gyro_pitch", "gyro_yaw"].map((h) => lower.indexOf(h));
+    const legacyIdx = [find(ROLL_HEADERS), find(PITCH_HEADERS), find(YAW_HEADERS)];
+    const rateIdx = gyroIdx.every((i) => i !== -1) ? gyroIdx
+                : legacyIdx.some((i) => i !== -1) ? legacyIdx : null;
+    const tiltIdx = lower.indexOf("tilt");
 
     return rows.map((row) => {
+        const num = (i: number) => (i === -1 ? 0 : Number(row[i]) || 0);
+        const motion: RocketMotion | null = rateIdx || tiltIdx !== -1
+            ? { rate: rateIdx ? (rateIdx.map(num)) : undefined,
+                tilt: tiltIdx !== -1 ? num(tiltIdx) : undefined } as RocketMotion
+            : null;
         const t = timeIdx === -1 ? NaN : Number(row[timeIdx]);
+
         return {
             fields: headers.map((h, i) => field(h, row[i] ?? "")),
             timeMs: Number.isFinite(t) ? t * timeScale : null,
-            rotation: hasRotation
-                ? (rotIdx.map((i) => (i === -1 ? 0 : Number(row[i]) || 0)) as RocketRotation)
-                : null,
+            rotation: motion
         };
     });
 }
@@ -66,10 +102,11 @@ export function liveToFrame(t: LiveTelemetry): Frame {
 }
 
 export function liveESPToFrames(d: EspData): Frame {
+    const k = ESP_GYRO_IN_RAD ? 180 / Math.PI : 1;
     return {
         fields: live_columns.map((c) => field(c.label, d[c.key].toFixed(c.decimals))),
-        timeMs: null,       // the ESP32 has no device clock
-        rotation: null,
+        timeMs: performance.now(),    // no device clock: stamp arrival time
+        rotation: { rate: [d.rotX * k, d.rotY * k, d.rotZ * k] } as RocketMotion,
     };
 }
 
@@ -108,5 +145,12 @@ export function snapshotToFrame(s: Snapshot): Frame {
     add("Callsign", config && String.fromCharCode(...config.callsign.filter((c) => c !== 0)));
     add("RSSI / LQI", `${s.link.rssiDbm.toFixed(0)} dBm / ${s.link.lqi & 0x7f}`);
 
-    return { fields, timeMs: s.timeS * 1000, rotation: null };
+    return {
+        fields,
+        timeMs: s.timeS * 1000,
+        rotation: imu ? {
+            rate: [imu.gyroX, imu.gyroY, imu.gyroZ].map((v) => v * GYRO_DPS_PER_LSB),
+            tilt: imu.orient,
+        } as RocketMotion : null,
+    };
 }

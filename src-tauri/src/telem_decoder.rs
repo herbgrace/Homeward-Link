@@ -12,8 +12,8 @@ pub const PAYLOAD_LEN: usize = PACKET_LEN - 5; // 27 data bytes
 
 /// AltOS flight state 3 = boost (confirmed by your CSV).
 const STATE_BOOST: u8 = 3;
-/// Seconds of pad time to keep before the first boost report. AltOS keeps none.
-const PAD_LEAD_S: f64 = 0.0;
+/// Seconds of pad time to keep before the first boost report. AltOS keeps 2 seconds.
+pub const PAD_LEAD_S: f64 = 2.0;
 
 /// Unwraps the 16-bit, 1/100 s tick counter (wraps every ~655 s) into a continuous clock.
 #[derive(Default)]

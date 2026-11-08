@@ -197,7 +197,7 @@ mod tests {
     use super::*;
     use crate::config_controller::AppConfig;
     use crate::state_controller::AppState;
-    use crate::telem_decoder::{PACKET_LEN, PAYLOAD_LEN};
+    use crate::telem_decoder::{PACKET_LEN, PAYLOAD_LEN, PAD_LEAD_S};
     use std::future::Future;
     use std::path::{Path, PathBuf};
     use tauri::test::{mock_app, MockRuntime};
@@ -312,8 +312,8 @@ mod tests {
 
     fn corrupt_line() -> String { telem_line(0x14, 5, &imu_payload(1), BAD_LQI) }
 
-    /// 4 pad packets, then boost at tick 1203 (t = 0). With PAD_LEAD_S = 0, only the last
-    /// 3 packets survive: times 0.00, 0.97, 1.00 s.
+    /// 4 pad packets, then boost at tick 1203 (t = 0). With PAD_LEAD_S = 2.0 only the first packet
+    /// (t = -2.03 s) is cut: 7 snapshots at -2.00, -1.03, -1.00, -0.03, 0.00, 0.97, 1.00 s.
     fn flight_lines() -> Vec<String> {
         vec![
             telem_line(0x14, 1000, &imu_payload(90_822), GOOD_LQI), // pad
@@ -436,7 +436,7 @@ mod tests {
         assert_eq!(rows_of(load_all(&csv).unwrap()).len(), 3);
 
         let telem = write_lines(tmp.path(), "FLIGHT.TELEM", &flight_lines(), "\n");
-        assert_eq!(telem_of(load_all(&telem).unwrap()).0.len(), 3);
+        assert_eq!(telem_of(load_all(&telem).unwrap()).0.len(), 7);
     }
 
     // ───────────────────────── CSV: load_all_flight_data ─────────────────────────
@@ -615,23 +615,26 @@ mod tests {
     // ───────────────────────── TELEM: load_all_flight_data ─────────────────────────
 
     #[test]
-    fn telem_load_all_builds_merged_snapshots_from_boost_onwards() {
+    fn telem_load_all_keeps_the_pad_lead_and_merges_packets() {
         let tmp = tempdir().unwrap();
         let file = write_lines(tmp.path(), "f.telem", &flight_lines(), "\n");
         let (snaps, stats) = telem_of(load_all(&file).unwrap());
 
-        // The first 5 packets (pad + the IMU before the boost report) are dropped, like AltOS' CSV
-        assert_eq!(snaps.len(), 3);
-        assert_times(&snaps, &[0.0, 0.97, 1.0]);
-        assert_eq!(snaps[0].uptime_ms, 12_030);
-        assert!(snaps.iter().all(|s| s.time_s >= 0.0));
+        assert_times(&snaps, &[-2.0, -1.03, -1.0, -0.03, 0.0, 0.97, 1.0]);
+        assert_eq!(snaps[0].uptime_ms, 10_030);
+        assert_eq!(snaps[4].uptime_ms, 12_030); // the boost report is t = 0
+        assert!(snaps.iter().all(|s| s.time_s >= -PAD_LEAD_S));
 
-        // Merging: each snapshot carries the latest of BOTH packet types
-        let k = |i: usize| snaps[i].latest.kalman.as_ref().unwrap().state;
+        let state = |i: usize| snaps[i].latest.kalman.as_ref().unwrap().state;
         let pres = |i: usize| snaps[i].latest.imu.as_ref().unwrap().pres;
-        assert_eq!((k(0), pres(0)), (3, 90_800)); // boost report + the earlier IMU
-        assert_eq!((k(1), pres(1)), (3, 90_000)); // new IMU, Kalman carried over
-        assert_eq!((k(2), pres(2)), (4, 90_000)); // new Kalman, IMU carried over
+
+        // Merging happens BEFORE the lead filter: the first kept row (a Kalman packet)
+        // still carries the pressure from the IMU packet that was itself cut.
+        assert_eq!((state(0), pres(0)), (2, 90_822));
+        assert_eq!((state(3), pres(3)), (2, 90_800)); // pad IMU just before the boost report
+        assert_eq!((state(4), pres(4)), (3, 90_800)); // boost report + that IMU
+        assert_eq!((state(5), pres(5)), (3, 90_000)); // new IMU, Kalman carried over
+        assert_eq!((state(6), pres(6)), (4, 90_000)); // new Kalman, IMU carried over
 
         assert_eq!((stats.lines, stats.ok, stats.crc_failed, stats.other_errors), (8, 8, 0, 0));
     }
@@ -691,7 +694,7 @@ mod tests {
         let file = write_lines(tmp.path(), "crlf.telem", &lines, "\r\n");
         let (snaps, stats) = telem_of(load_all(&file).unwrap());
 
-        assert_eq!(snaps.len(), 3);
+        assert_eq!(snaps.len(), 7);
         assert_eq!((stats.lines, stats.ok), (8, 8));
     }
 
@@ -740,29 +743,41 @@ mod tests {
         let state = app.state::<AppState>();
 
         let (p0, _) = telem_of(load_block(&state, &file).unwrap());
-        assert_times(&p0, &[0.0, 0.97]);
+        assert_times(&p0, &[-2.0, -1.03]);
         assert_eq!(counter(&state), 1);
 
         let (p1, _) = telem_of(load_block(&state, &file).unwrap());
-        assert_times(&p1, &[1.0]); // partial last block
+        assert_times(&p1, &[-1.0, -0.03]);
         assert_eq!(counter(&state), 2);
 
         let (p2, _) = telem_of(load_block(&state, &file).unwrap());
-        assert!(p2.is_empty()); // past the end
-        assert_eq!(counter(&state), 2); // an empty page does not advance the counter
+        assert_times(&p2, &[0.0, 0.97]);
+        assert_eq!(counter(&state), 3);
+
+        let (p3, _) = telem_of(load_block(&state, &file).unwrap());
+        assert_times(&p3, &[1.0]); // partial last block
+        assert_eq!(counter(&state), 4);
+
+        let (p4, _) = telem_of(load_block(&state, &file).unwrap());
+        assert!(p4.is_empty()); // past the end
+        assert_eq!(counter(&state), 4); // an empty page does not advance the counter
     }
 
     #[test]
     fn telem_exact_multiple_of_block_size_has_no_trailing_empty_block() {
         let tmp = tempdir().unwrap();
-        let file = write_lines(tmp.path(), "f.telem", &flight_lines(), "\n");
-        let app = app_with_dir(tmp.path(), 3); // exactly the 3 snapshots
+        // 6 snapshots remain (-1.03 ... 1.00), all inside the lead window
+        let lines: Vec<String> = flight_lines().into_iter().skip(2).collect();
+        let file = write_lines(tmp.path(), "f.telem", &lines, "\n");
+        let app = app_with_dir(tmp.path(), 3);
         let state = app.state::<AppState>();
 
         assert_eq!(telem_of(load_block(&state, &file).unwrap()).0.len(), 3);
         assert_eq!(counter(&state), 1);
+        assert_eq!(telem_of(load_block(&state, &file).unwrap()).0.len(), 3);
+        assert_eq!(counter(&state), 2);
         assert!(telem_of(load_block(&state, &file).unwrap()).0.is_empty());
-        assert_eq!(counter(&state), 1);
+        assert_eq!(counter(&state), 2); // no trailing empty block
     }
 
     #[test]
@@ -808,5 +823,25 @@ mod tests {
 
         assert!(telem_of(load_block(&state, &file).unwrap()).0.is_empty());
         assert_eq!(counter(&state), 0);
+    }
+
+    #[test]
+    fn pad_lead_matches_the_fixtures() {
+        assert_eq!(PAD_LEAD_S, 2.0, "these fixtures are written for a 2 s lead; update them if you change it");
+    }
+
+    #[test]
+    fn telem_pad_lead_window_boundary_is_inclusive() {
+        let tmp = tempdir().unwrap();
+        let lines = vec![
+            telem_line(0x14, 1000, &imu_payload(1), GOOD_LQI),    // t = -2.01: just outside, dropped
+            telem_line(0x14, 1001, &imu_payload(2), GOOD_LQI),    // t = -2.00: on the edge, kept
+            telem_line(0x14, 1002, &imu_payload(3), GOOD_LQI),    // t = -1.99: kept
+            telem_line(0x15, 1201, &kalman_payload(3), GOOD_LQI), // boost report: t = 0
+        ];
+        let file = write_lines(tmp.path(), "edge.telem", &lines, "\n");
+        let (snaps, _) = telem_of(load_all(&file).unwrap());
+
+        assert_times(&snaps, &[-2.0, -1.99, 0.0]);
     }
 }
