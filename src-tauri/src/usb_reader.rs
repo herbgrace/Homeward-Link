@@ -37,7 +37,7 @@ pub struct ESPData {
 type Decoder = Box<dyn FnMut(&str) -> Option<LiveTelemetry>>;
 
 fn esp32_decoder() -> Decoder {
-    Box::new(parse_esp32)   // your existing fn(&str) -> Option<LiveTelemetry>
+    Box::new(parse_esp32)
 }
 
 fn teledongle_decoder() -> Decoder {

@@ -106,7 +106,8 @@ export function liveESPToFrames(d: EspData): Frame {
     return {
         fields: live_columns.map((c) => field(c.label, d[c.key].toFixed(c.decimals))),
         timeMs: performance.now(),    // no device clock: stamp arrival time
-        rotation: { rate: [d.rotX * k, d.rotY * k, d.rotZ * k] } as RocketMotion,
+        rotation: { rate: [-d.rotY * k, -d.rotX * k, d.rotZ * k] } as RocketMotion,
+        // Hardcoded for my ESP32 mounting... make variable?
     };
 }
 
