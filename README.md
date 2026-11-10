@@ -11,13 +11,24 @@ Temporary Icon ^
     - [Using a pre-built installer](#method-1-using-a-pre-built-installer)
     - [Building your own installer](#method-2-building-an-installer-locally)
 - [Technologies](#technologies)
-- [Running Locally](#how-to-runmodify-locally)
+- [Running/Contributing Locally](#how-to-runcontribute-locally)
 - [License](#license)
 - [Feedback](#feedback)
 
-
 ## About
+`Homeward-Link` was built as a collaboration between Neumont University & The University of Illinois' Liquid Rocketry Program. 
 
+It's the Capstone Project of Alex Thelen (Neumont), originally built in 10 weeks.
+
+It allows displaying telemetry data of rocket flights, both past and live. It was built to support Altus Metrum's devices, which includes the TeleDongle and the following boards:
+- TeleMetrum
+- TeleMini
+- TeleNano
+- MegaImu
+- MegaKalman
+- Companion Devices
+
+It was tested locally using an ESP32 + MPU6050 transmitter & ESP32 Receiver. 
 
 ## Technologies
 Frameworks: [Tauri](https://v2.tauri.app/) + [Vite](https://vite.dev/)
@@ -67,6 +78,9 @@ Once your feature is complete, open a Pull Request for approval
 [VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).
 
 ## License
-`Homeward-Link` is built as a completely open-source 
+`Homeward-Link` is built as a completely open-source project. Personal use & Commercial use are allowed with no restrictions. See [The License](LICENSE) For more information.
 
 ## Feedback
+Any questions or concerns are always welcome!
+
+Emailing [thelen.alexander05@gmail.com](mailto:thelen.alexander05@gmail.com) is the quickest way to have your feedback seen, but [Creating a Github Discussion](https://github.com/herbgrace/Homeward-Link/discussions) is also a good way to have your voice heard!
