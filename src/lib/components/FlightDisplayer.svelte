@@ -52,6 +52,7 @@ $effect(() => {
             order={modelPose.order}
             scale={0.25}
         />
+        
     </div>
 
     <main class="main-content">
@@ -60,8 +61,13 @@ $effect(() => {
                 <button class="return-button" onclick={() => goto("/previous-flights")}>Return</button>
             {/if}
 
-            <button onclick={startReplayMethod} disabled={isPlaying}>Play</button>
-            <button onclick={pauseReplayMethod} disabled={!isPlaying}>Pause</button>
+            <button onclick={(e) => (isPlaying ? pauseReplayMethod(e) : startReplayMethod(e))}>
+                {#if isPlaying}
+                    Pause
+                {:else}
+                    Play
+                {/if}
+            </button>
 
             {#if !isLive}
                 <h3>{fileName}</h3>
