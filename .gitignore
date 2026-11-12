@@ -10,3 +10,5 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .secrets
 localBuilds.md
+static/img/visualizations 
+# Copied locally after installing npm packages
