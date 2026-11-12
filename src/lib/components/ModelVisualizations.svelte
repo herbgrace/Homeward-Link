@@ -1,28 +1,38 @@
 <script lang="ts">
     import FlightIndicators from "flight-indicators-js";
-    import { fill } from "three/src/extras/TextureUtils.js";
 
-    const MAX_COUNT = 5;
+    const MAX_COUNT = 6;
     let count = $state(3);
     let { rollVal = 0, pitchVal = 0 } = $props();
 
     let visualizers = new Set<any>();
-    const initTypes = ["attitude", "altimeter", "vertical"];
-    const filledTypes = Array(MAX_COUNT - initTypes.length).fill('attitude');
-    const indicatorTypes = [...initTypes, ...filledTypes];
+    const POSSIBLE_TYPES = ["attitude", "altimeter", "vertical", "coordinator", "heading", "airspeed"]
+
+    let current_types = $state([...POSSIBLE_TYPES]);
 
     $effect(() => {
         rollVal;
         pitchVal;
 
         visualizers.forEach((v) => {
-            v.updateRoll(rollVal);
-            v.updatePitch(pitchVal);
+            if (v) {
+                v.updateRoll(rollVal);
+                v.updatePitch(pitchVal);
+            }
         });
     });
 
-    function initIndicator(node: HTMLElement, type: string) {
-        const instance = new FlightIndicators(node, type, {
+
+    function initIndicator(node: HTMLElement, initialType: string) {
+    let instance: any;
+
+    function create(type: string) {
+        if (instance) {
+            visualizers.delete(instance);
+            node.innerHTML = "";
+        }
+
+        instance = new FlightIndicators(node, type, {
             size: 180,
             roll: rollVal,
             pitch: pitchVal,
@@ -31,14 +41,24 @@
         });
 
         visualizers.add(instance);
-
-        return {
-            destroy() {
-                // Clean up reference when count decreases and element is removed
-                visualizers.delete(instance);
-            }
-        };
     }
+
+    // Run on initial mount
+    create(initialType);
+
+    return {
+        // Automatically called by Svelte whenever `type` changes
+        update(newType: string) {
+            create(newType);
+        },
+        destroy() {
+            if (instance) {
+                visualizers.delete(instance);
+                node.innerHTML = "";
+            }
+        }
+    };
+}
 </script>
 
 <main>
@@ -50,7 +70,22 @@
         bind:value={count}
     >
     
-    {#each indicatorTypes.slice(0, count) as type}
+    {#each current_types.slice(0, count) as type, i}
+        <select 
+            name="Visualizer Type" 
+            id='visualizer-selection-{i}' 
+            bind:value={current_types[i]}
+        >
+            {#each POSSIBLE_TYPES as possible_type}
+                <option 
+                    id="type-selection-{i}-{possible_type}" 
+                    selected={type==possible_type}
+                    value={possible_type}
+                >
+                    {possible_type}
+                </option>
+            {/each}
+        </select>
         <div class="visualizers-stack">
             <div use:initIndicator={type} class="layer"></div>
         </div>
