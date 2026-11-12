@@ -4,33 +4,15 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import process from "node:process";
 const host = process.env.TAURI_DEV_HOST;
 
-// Custom plugin to remove visualizations from the output bundle
-function excludeVisualizationsPlugin() {
-  return {
-    name: 'exclude-visualizations',
-    /**
-     * @param {any} _
-     * @param {{ [x: string]: any; }} bundle
-     */
-    generateBundle(_, bundle) {
-      for (const fileName in bundle) {
-        if (fileName.startsWith('img/visualizations')) {
-          delete bundle[fileName];
-        }
-      }
-    }
-  };
-}
-
 // https://vite.dev/config/
 export default defineConfig(() => ({
-  plugins: [
-    sveltekit(),
-    excludeVisualizationsPlugin()
-  ],
+  plugins: [sveltekit()],
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
+  //
+  // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
+  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
     strictPort: true,

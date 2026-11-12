@@ -26,7 +26,7 @@
                     roll: rollVal,
                     pitch: pitchVal,
                     hideBox: true,
-                    imagesDirectory: "/img/visualizations/",
+                    imagesDirectory: "/img/visualizations",
                 });
                 visualizers.push(instance)
             }
