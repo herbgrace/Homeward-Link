@@ -1,12 +1,15 @@
 <script lang="ts">
     import FlightIndicators from "flight-indicators-js";
+    import { fill } from "three/src/extras/TextureUtils.js";
 
     const MAX_COUNT = 5;
     let count = $state(3);
     let { rollVal = 0, pitchVal = 0 } = $props();
 
     let visualizers = new Set<any>();
-    const indicatorTypes = Array(MAX_COUNT).fill('attitude');
+    const initTypes = ["attitude", "altimeter", "vertical"];
+    const filledTypes = Array(MAX_COUNT - initTypes.length).fill('attitude');
+    const indicatorTypes = [...initTypes, ...filledTypes];
 
     $effect(() => {
         rollVal;
