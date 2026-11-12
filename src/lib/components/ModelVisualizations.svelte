@@ -1,53 +1,58 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import FlightIndicators from "flight-indicators-js"
+    import FlightIndicators from "flight-indicators-js";
 
-    let count = 3
-
-    let elements: [HTMLDivElement | null, string][] = Array.from({ length: count }, () => [null, 'attitude']);
-    let visualizers: typeof FlightIndicators[] = [];
-
+    const MAX_COUNT = 5;
+    let count = $state(3);
     let { rollVal = 0, pitchVal = 0 } = $props();
+
+    let visualizers = new Set<any>();
+    const indicatorTypes = Array(MAX_COUNT).fill('attitude');
 
     $effect(() => {
         rollVal;
         pitchVal;
 
-        visualizers.forEach(v => {
-            updateHorizon(v);
-        })
-    })
-
-    onMount(() => {
-        elements.forEach(([elem, type]) => {
-            if (elem) {
-                const instance = new FlightIndicators(elem, type, {
-                    size: 180,
-                    roll: rollVal,
-                    pitch: pitchVal,
-                    hideBox: true,
-                    imagesDirectory: "/img/visualizations",
-                });
-                visualizers.push(instance)
-            }
+        visualizers.forEach((v) => {
+            v.updateRoll(rollVal);
+            v.updatePitch(pitchVal);
         });
     });
 
-    function updateHorizon(indicator: typeof FlightIndicators) {
-        if (indicator) {
-            indicator.updateRoll(rollVal);
-            indicator.updatePitch(pitchVal);
-        }
+    function initIndicator(node: HTMLElement, type: string) {
+        const instance = new FlightIndicators(node, type, {
+            size: 180,
+            roll: rollVal,
+            pitch: pitchVal,
+            hideBox: true,
+            imagesDirectory: "/img/visualizations",
+        });
+
+        visualizers.add(instance);
+
+        return {
+            destroy() {
+                // Clean up reference when count decreases and element is removed
+                visualizers.delete(instance);
+            }
+        };
     }
 </script>
 
-
-{#each elements as [_, type], i}
-    <div class="visualizers-stack">
-        <div bind:this={elements[i][0]} class="layer"></div>
-    </div>
-{/each}
-
+<main>
+    <input 
+        type="number" 
+        id="visualizer-count" 
+        min="0" 
+        max={MAX_COUNT} 
+        bind:value={count}
+    >
+    
+    {#each indicatorTypes.slice(0, count) as type}
+        <div class="visualizers-stack">
+            <div use:initIndicator={type} class="layer"></div>
+        </div>
+    {/each}
+</main>
 
 <style>
     .visualizers-stack {
