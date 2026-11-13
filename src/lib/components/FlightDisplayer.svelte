@@ -33,7 +33,17 @@ let modelPose = $derived(toModelPose(rotation));
 let speed: number = $derived(
     Number.parseFloat(
         FindField(frame, 'speed')?.slice(0, -3) ?? '0'
-    ) * 0.06 // To km/min
+    ) // In m/s
+)
+let altitude: number = $derived(
+    Number.parseFloat(
+        FindField(frame, 'height')?.slice(0, -1) ?? '0'
+    )
+)
+let pressure: number = $derived(
+    Number.parseFloat(
+        FindField(frame, 'pressure')?.slice(0, -2) ?? '0'
+    ) * 0.01 // From Pa to hPa
 )
 
 const tracker = new OrientationTracker();
@@ -66,10 +76,10 @@ $effect(() => {
             pitchVal={modelPose.y}
             turnVal={modelPose.z} // Sets rotation of the TC
             headingVal={0} // Heading angle in degrees for an heading indicator
-            vertSpeed={speed} // Vertical speed in km/min for the vertical speed indicator
-            airspeedVal={0} // Air speed in meters/hour for an air speed indicator
-            altVal={0} // Altitude in meters for an altimeter indicator
-            pressureVal={0} // Pressure in hPa for an altimeter indicator
+            vertSpeed={speed * 0.06} // Vertical speed in km/min for the vertical speed indicator
+            airspeedVal={speed * 60} // Air speed in meters/hour for an air speed indicator
+            altVal={altitude} // Altitude in meters for an altimeter indicator
+            pressureVal={pressure} // Pressure in hPa for an altimeter indicator
         />
     </div>
 
