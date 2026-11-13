@@ -72,10 +72,8 @@ $effect(() => {
         
         <!-- TODO - Determine which axis is correct for roll/pitch -->
         <ModelVisualizations 
-            rollVal={modelPose.x}
-            pitchVal={modelPose.y}
-            turnVal={modelPose.z} // Sets rotation of the TC
-            headingVal={0} // Heading angle in degrees for an heading indicator
+            rollVal={modelPose.x} // Roll in degrees
+            pitchVal={modelPose.y} // Pitch in degrees
             vertSpeed={speed * 0.06} // Vertical speed in km/min for the vertical speed indicator
             airspeedVal={speed * 60} // Air speed in meters/hour for an air speed indicator
             altVal={altitude} // Altitude in meters for an altimeter indicator

@@ -4,8 +4,8 @@
     interface Props {
         rollVal: number;
         pitchVal: number;
-        turnVal: number;
-        headingVal: number;
+        // turnVal: number;
+        // headingVal: number;
         vertSpeed: number;
         airspeedVal: number;
         altVal: number;
@@ -15,27 +15,27 @@
     let { 
         rollVal,
         pitchVal,
-        turnVal,
-        headingVal,
+        // turnVal,
+        // headingVal,
         vertSpeed,
         airspeedVal,
         altVal,
         pressureVal,
     } : Props = $props();
 
-    const MAX_COUNT = 6;
+    const MAX_COUNT = 4;
     let count = $state(3);
 
     let visualizers = new Set<{instance: any; node: HTMLElement}>();
-    const POSSIBLE_TYPES = ["attitude", "altimeter", "vertical", "coordinator", "heading", "airspeed"]
+    const POSSIBLE_TYPES = ["altimeter", "vertical", "airspeed", "attitude"]
 
     let current_types = $state([...POSSIBLE_TYPES]);
 
     $effect(() => {
         rollVal;
         pitchVal;
-        turnVal;
-        headingVal;
+        // turnVal;
+        // headingVal;
         vertSpeed;
         airspeedVal;
         altVal;
@@ -46,25 +46,25 @@
             if (!instance || !node || !document.body.contains(node)) return;
 
             try {
-                switch (instance.type) {
-                    case POSSIBLE_TYPES[0]: // Attitude
+                switch (instance.type.toLower()) {
+                    case "attitude": // Attitude
                         instance.updateRoll(rollVal);
                         instance.updatePitch(pitchVal);
                         break;
-                    case POSSIBLE_TYPES[1]: // Altimeter
+                    case "altimeter": // Altimeter
                         instance.updateAltitude(altVal);
                         instance.updatePressure(pressureVal);
                         break;
-                    case POSSIBLE_TYPES[2]: // Vertical
+                    case "vertical": // Vertical
                         instance.updateVerticalSpeed(vertSpeed);
                         break;
-                    case POSSIBLE_TYPES[3]: // Coordinator
-                        instance.updateCoordinator(turnVal);
-                        break;
-                    case POSSIBLE_TYPES[4]: // Heading
-                        instance.updateHeading(headingVal);
-                        break;
-                    case POSSIBLE_TYPES[5]: // Airspeed
+                    // case POSSIBLE_TYPES[3]: // Coordinator
+                    //     instance.updateCoordinator(turnVal);
+                    //     break;
+                    // case POSSIBLE_TYPES[4]: // Heading
+                    //     instance.updateHeading(headingVal);
+                    //     break;
+                    case "airspeed": // Airspeed
                         instance.updateAirSpeed(airspeedVal);
                         break;
                     default:
