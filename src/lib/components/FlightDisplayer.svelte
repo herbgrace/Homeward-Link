@@ -1,7 +1,7 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
 import ModelViewer from "$lib/components/ModelViewer.svelte";
-import { type Frame, OrientationTracker } from "$lib/utils/frames";
+import { type Frame, OrientationTracker, FindField } from "$lib/utils/frames";
 import { onDestroy } from "svelte";
 import { toModelPose } from "$lib/utils/modelPose";
 import ModelVisualizations from "./ModelVisualizations.svelte";
@@ -29,6 +29,12 @@ let fileName = $derived(dataUrl?.split(/[\\/]/).at(-1))   // works with / and \ 
 let rocketPath = $state("/models/RussianRocket/RocketTweaked.glb");
 let rotation: number[] = $state([0, 0, 0]);
 let modelPose = $derived(toModelPose(rotation));
+
+let speed: number = $derived(
+    Number.parseFloat(
+        FindField(frame, 'speed')?.slice(0, -3) ?? '0'
+    ) * 0.06 // To km/min
+)
 
 const tracker = new OrientationTracker();
 
@@ -58,6 +64,12 @@ $effect(() => {
         <ModelVisualizations 
             rollVal={modelPose.x}
             pitchVal={modelPose.y}
+            turnVal={modelPose.z} // Sets rotation of the TC
+            headingVal={0} // Heading angle in degrees for an heading indicator
+            vertSpeed={speed} // Vertical speed in km/min for the vertical speed indicator
+            airspeedVal={0} // Air speed in meters/hour for an air speed indicator
+            altVal={0} // Altitude in meters for an altimeter indicator
+            pressureVal={0} // Pressure in hPa for an altimeter indicator
         />
     </div>
 

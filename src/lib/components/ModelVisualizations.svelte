@@ -1,11 +1,32 @@
 <script lang="ts">
     import FlightIndicators from "flight-indicators-js";
 
+    interface Props {
+        rollVal: number;
+        pitchVal: number;
+        turnVal: number;
+        headingVal: number;
+        vertSpeed: number;
+        airspeedVal: number;
+        altVal: number;
+        pressureVal: number;
+    }
+
+    let { 
+        rollVal,
+        pitchVal,
+        turnVal,
+        headingVal,
+        vertSpeed,
+        airspeedVal,
+        altVal,
+        pressureVal,
+    } : Props = $props();
+
     const MAX_COUNT = 6;
     let count = $state(3);
-    let { rollVal = 0, pitchVal = 0 } = $props();
 
-    let visualizers = new Set<any>();
+    let visualizers = new Set<{instance: any; node: HTMLElement}>();
     const POSSIBLE_TYPES = ["attitude", "altimeter", "vertical", "coordinator", "heading", "airspeed"]
 
     let current_types = $state([...POSSIBLE_TYPES]);
@@ -13,26 +34,60 @@
     $effect(() => {
         rollVal;
         pitchVal;
+        turnVal;
+        headingVal;
+        vertSpeed;
+        airspeedVal;
+        altVal;
+        pressureVal;
 
-        visualizers.forEach((v) => {
-            if (v) {
-                v.updateRoll(rollVal);
-                v.updatePitch(pitchVal);
+        visualizers.forEach(({ instance, node }) => {
+            // Safety check: ensure node is still in the DOM and instance exists
+            if (!instance || !node || !document.body.contains(node)) return;
+
+            try {
+                switch (instance.type) {
+                    case POSSIBLE_TYPES[0]: // Attitude
+                        instance.updateRoll(rollVal);
+                        instance.updatePitch(pitchVal);
+                        break;
+                    case POSSIBLE_TYPES[1]: // Altimeter
+                        instance.updateAltitude(altVal);
+                        instance.updatePressure(pressureVal);
+                        break;
+                    case POSSIBLE_TYPES[2]: // Vertical
+                        instance.updateVerticalSpeed(vertSpeed);
+                        break;
+                    case POSSIBLE_TYPES[3]: // Coordinator
+                        instance.updateCoordinator(turnVal);
+                        break;
+                    case POSSIBLE_TYPES[4]: // Heading
+                        instance.updateHeading(headingVal);
+                        break;
+                    case POSSIBLE_TYPES[5]: // Airspeed
+                        instance.updateAirSpeed(airspeedVal);
+                        break;
+                    default:
+                        break;
+                }
+            } catch (e) {
+                // Catch any stray DOM update errors gracefully
+                console.error("Error updating flight indicator:", e);
             }
         });
     });
 
 
-    function initIndicator(node: HTMLElement, initialType: string) {
-    let instance: any;
+function initIndicator(node: HTMLElement, initialType: string) {
+    let currentRecord: { instance: any; node: HTMLElement } | null = null;
 
     function create(type: string) {
-        if (instance) {
-            visualizers.delete(instance);
+        if (currentRecord) {
+            visualizers.delete(currentRecord);
             node.innerHTML = "";
         }
 
-        instance = new FlightIndicators(node, type, {
+        const instance = new FlightIndicators(node, type, {
             size: 180,
             roll: rollVal,
             pitch: pitchVal,
@@ -40,20 +95,23 @@
             imagesDirectory: "/img/visualizations",
         });
 
-        visualizers.add(instance);
+        // Assign type to instance for reference if needed
+        instance.type = type;
+
+        currentRecord = { instance, node };
+        visualizers.add(currentRecord);
     }
 
-    // Run on initial mount
     create(initialType);
 
     return {
-        // Automatically called by Svelte whenever `type` changes
         update(newType: string) {
             create(newType);
         },
         destroy() {
-            if (instance) {
-                visualizers.delete(instance);
+            if (currentRecord) {
+                visualizers.delete(currentRecord);
+                currentRecord = null;
                 node.innerHTML = "";
             }
         }
