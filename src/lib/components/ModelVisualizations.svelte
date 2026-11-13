@@ -46,7 +46,7 @@
             if (!instance || !node || !document.body.contains(node)) return;
 
             try {
-                switch (instance.type.toLower()) {
+                switch (instance.type) {
                     case "attitude": // Attitude
                         instance.updateRoll(rollVal);
                         instance.updatePitch(pitchVal);
@@ -151,6 +151,23 @@ function initIndicator(node: HTMLElement, initialType: string) {
 </main>
 
 <style>
+    #visualizer-count {
+        display: flex;
+        justify-self: center;
+    }
+
+    select {
+        display: flex;
+        margin-top: 1rem;
+        margin-right: 1.5rem;
+        justify-self: flex-end;
+        align-self: flex-end;
+        background-color: var(--button-background);
+        color: var(--button-text);
+        padding: 0.15rem;
+        border-radius: 0.25rem;
+    }
+
     .visualizers-stack {
         display: grid;
         width: 100%;
