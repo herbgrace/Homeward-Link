@@ -1,9 +1,10 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
 import ModelViewer from "$lib/components/ModelViewer.svelte";
-import { type Frame, OrientationTracker } from "$lib/utils/frames";
+import { type Frame, OrientationTracker, FindField } from "$lib/utils/frames";
 import { onDestroy } from "svelte";
 import { toModelPose } from "$lib/utils/modelPose";
+import ModelVisualizations from "./ModelVisualizations.svelte";
 
 interface Props {
     dataUrl?: string,
@@ -29,6 +30,22 @@ let rocketPath = $state("/models/RussianRocket/RocketTweaked.glb");
 let rotation: number[] = $state([0, 0, 0]);
 let modelPose = $derived(toModelPose(rotation));
 
+let speed: number = $derived(
+    Number.parseFloat(
+        FindField(frame, 'speed')?.slice(0, -3) ?? '0'
+    ) // In m/s
+)
+let altitude: number = $derived(
+    Number.parseFloat(
+        FindField(frame, 'height')?.slice(0, -1) ?? '0'
+    )
+)
+let pressure: number = $derived(
+    Number.parseFloat(
+        FindField(frame, 'pressure')?.slice(0, -2) ?? '0'
+    ) * 0.01 // From Pa to hPa
+)
+
 const tracker = new OrientationTracker();
 
 onDestroy(() => {
@@ -53,6 +70,15 @@ $effect(() => {
             scale={0.25}
         />
         
+        <!-- TODO - Determine which axis is correct for roll/pitch -->
+        <ModelVisualizations 
+            rollVal={modelPose.x} // Roll in degrees
+            pitchVal={modelPose.y} // Pitch in degrees
+            vertSpeed={speed * 0.06} // Vertical speed in km/min for the vertical speed indicator
+            airspeedVal={speed * 60} // Air speed in meters/hour for an air speed indicator
+            altVal={altitude} // Altitude in meters for an altimeter indicator
+            pressureVal={pressure} // Pressure in hPa for an altimeter indicator
+        />
     </div>
 
     <main class="main-content">
@@ -92,8 +118,6 @@ $effect(() => {
 </div>
 
 <style>
-    /* Global rules are usually best in an external global.css, 
-    but kept here to ensure height fills the screen */
     :global(html), :global(body) {
         margin: 0;
         padding: 0;
@@ -102,7 +126,6 @@ $effect(() => {
 
     .content-container {
         display: grid;
-        /* Sidebar takes 250px exactly, main content takes 100% of remaining space */
         grid-template-columns: 250px 1fr;
         min-height: 100vh;
         width: 100%;
@@ -110,38 +133,45 @@ $effect(() => {
 
     .sidebar {
         background: var(--secondary-color, #f4f4f4);
-        box-shadow: 2px 0 5px rgba(0,0,0,0.1); /* Flipped shadow direction to the right */
+        box-shadow: 2px 0 5px rgba(0,0,0,0.1);
         padding: 1rem;
         padding-top: 0.5rem;
         border-right: 1px solid var(--accent-color, #ccc);
         box-sizing: border-box;       
-        display: flex;                
+        display: flex;                            
         flex-direction: column;       
         gap: 1rem;                    
+        width: 100%;
+        overflow-x: hidden; /* Prevents any child elements from breaking out horizontally */
+    }
+
+    .sidebar > :global(*) {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
     }
 
     .main-content {
         padding: 2rem;
         box-sizing: border-box;
-        
         display: flex;
-        flex-direction: column;   /* Stack the header-bar and flight-data vertically */
-        justify-content: flex-start;  /* Align content vertically */
-        align-items: center;      /* Center content horizontally */
-        gap: 1.5rem;              /* Add clean spacing between header and flight data */
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 1.5rem;
     }
 
     .header-bar {
         display: flex;
         align-items: center;
-        gap: 0.5rem;              /* Spacing between buttons and text */
+        gap: 0.5rem;
         width: 100%;
-        max-width: 800px;         /* Keeps the table and header aligned nicely */
+        max-width: 800px;
     }
 
     .flight-data {
         width: 100%;
-        max-width: 800px;         /* Limits content stretch on extremely wide monitors */
+        max-width: 800px;
         box-sizing: border-box;
     }
 
@@ -153,6 +183,7 @@ $effect(() => {
     h3 {
         margin: 0 0 0 1rem;
     }
+
     .fields {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -165,6 +196,5 @@ $effect(() => {
     }
 
     dt { font-weight: 600; }
-
     dd { margin: 0; }
 </style>

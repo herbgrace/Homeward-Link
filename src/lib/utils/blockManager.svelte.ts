@@ -60,7 +60,7 @@ export function get_current_frame_and_increment(): Frame | undefined {
 export function get_next_frame_and_increment(): Frame | undefined {
     const frame = get_next_frame();
     increment_counter();
-    console.log("Getting the next frame and incrementing!");
+    // console.log("Getting the next frame and incrementing!");
     return frame;
 }
 

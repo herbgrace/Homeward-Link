@@ -19,6 +19,12 @@ export interface Frame {
     rotation: RocketMotion | null; // null = this frame has no orientation data
 }
 
+export function FindField(frame: Frame | undefined, field: string): string | undefined {
+    return frame?.fields.find(
+        (f) => f.label.toLowerCase() === field.toLowerCase()
+    )?.value;
+}
+
 export class OrientationTracker {
     private lastMs: number | null = null;
     private lastRate = [0, 0, 0];   // °/s, held until the next sample
