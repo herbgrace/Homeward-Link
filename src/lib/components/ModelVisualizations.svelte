@@ -24,7 +24,7 @@
     } : Props = $props();
 
     const MAX_COUNT = 4;
-    let count = $state(3);
+    let count = $state(4);
 
     let visualizers = new Set<{instance: any; node: HTMLElement}>();
     const POSSIBLE_TYPES = ["altimeter", "vertical", "airspeed", "attitude"]
@@ -128,11 +128,12 @@ function initIndicator(node: HTMLElement, initialType: string) {
         bind:value={count}
     >
 
-    <div class="all-visualizers">
+    <div id="all-visualizers">
         {#each current_types.slice(0, count) as type, i}
             <div class="visualizer-{i}" id="visualizer-box">
                 <select 
                     name="Visualizer Type" 
+                    class="visualizer-selection"
                     id='visualizer-selection-{i}' 
                     bind:value={current_types[i]}
                 >
@@ -160,6 +161,7 @@ function initIndicator(node: HTMLElement, initialType: string) {
         flex: 1;
         width: fit-content;
         min-width: none;
+        max-width: 50%;
     }
 
     #visualizer-count {
@@ -167,7 +169,7 @@ function initIndicator(node: HTMLElement, initialType: string) {
         justify-self: center;
     }
 
-    .all-visualizers {
+    #all-visualizers {
         display: flex;
         flex-direction: row;
         flex-wrap: wrap;
@@ -178,6 +180,7 @@ function initIndicator(node: HTMLElement, initialType: string) {
         /* display: flex; */
         margin-top: 1rem;
         margin-right: 1.5rem;
+        margin-left: 0.25rem;
         justify-self: flex-end;
         align-self: flex-end;
         background-color: var(--button-background);
