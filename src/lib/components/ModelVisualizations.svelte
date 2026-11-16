@@ -127,37 +127,55 @@ function initIndicator(node: HTMLElement, initialType: string) {
         max={MAX_COUNT} 
         bind:value={count}
     >
-    
-    {#each current_types.slice(0, count) as type, i}
-        <select 
-            name="Visualizer Type" 
-            id='visualizer-selection-{i}' 
-            bind:value={current_types[i]}
-        >
-            {#each POSSIBLE_TYPES as possible_type}
-                <option 
-                    id="type-selection-{i}-{possible_type}" 
-                    selected={type==possible_type}
-                    value={possible_type}
+
+    <div class="all-visualizers">
+        {#each current_types.slice(0, count) as type, i}
+            <div class="visualizer-{i}" id="visualizer-box">
+                <select 
+                    name="Visualizer Type" 
+                    id='visualizer-selection-{i}' 
+                    bind:value={current_types[i]}
                 >
-                    {possible_type}
-                </option>
-            {/each}
-        </select>
-        <div class="visualizers-stack">
-            <div use:initIndicator={type} class="layer"></div>
-        </div>
-    {/each}
+                    {#each POSSIBLE_TYPES as possible_type}
+                        <option 
+                            id="type-selection-{i}-{possible_type}" 
+                            selected={type==possible_type}
+                            value={possible_type}
+                        >
+                            {possible_type}
+                        </option>
+                    {/each}
+                </select>
+                <div class="visualizers-stack">
+                    <div use:initIndicator={type} class="layer"></div>
+                </div>
+            </div>
+        {/each}
+    </div>
 </main>
 
 <style>
+    #visualizer-box {
+        /* display: flex; */
+        flex: 1;
+        width: fit-content;
+        min-width: none;
+    }
+
     #visualizer-count {
         display: flex;
         justify-self: center;
     }
 
-    select {
+    .all-visualizers {
         display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-content: space-between;
+    }
+
+    select {
+        /* display: flex; */
         margin-top: 1rem;
         margin-right: 1.5rem;
         justify-self: flex-end;
@@ -170,9 +188,11 @@ function initIndicator(node: HTMLElement, initialType: string) {
 
     .visualizers-stack {
         display: grid;
-        width: 100%;
+        width: 50%;
+        height: 50%;
         justify-items: center;
         position: relative;
+        align-self: flex-start;
     }
 
     .layer {
@@ -184,8 +204,8 @@ function initIndicator(node: HTMLElement, initialType: string) {
 
     /* Force the library's injected .instrument and its internal image boxes to respect the 180px boundary */
     :global(.layer > .instrument) {
-        width: 180px !important;
-        height: 180px !important;
+        width: 120px !important;
+        height: 120px !important;
         position: relative !important;
         overflow: hidden !important;
     }

@@ -127,7 +127,7 @@ $effect(() => {
 
     .content-container {
         display: grid;
-        grid-template-columns: 250px 1fr;
+        grid-template-columns: 300px 1fr;
         min-height: 100vh;
         width: 100%;
     }

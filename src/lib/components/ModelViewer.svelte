@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { text } from '@sveltejs/kit';
   import { onMount } from 'svelte';
   import * as THREE from 'three';
   import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -80,7 +79,7 @@
 
     // Add Background Objects
     background = new THREE.Group();
-    const backgroundTexture = textureLoader.load('/img/spaceBackground.png');
+    const backgroundTexture = textureLoader.load('/img/gradientBackground.png');
 
     const backgroundGeometry = new THREE.PlaneGeometry(20, 30);
     const backgroundMaterial = new THREE.MeshBasicMaterial({
@@ -88,7 +87,7 @@
       side: THREE.DoubleSide
     });
     let backgroundMesh = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
-    backgroundMesh.position.set(0, -5, -10);
+    backgroundMesh.position.set(0, 3, -10);
 
     background.add(backgroundMesh);
     scene.add(background);
@@ -106,7 +105,6 @@
         pivot.add(model);
         scene.add(pivot);
         camera.lookAt(0, 0, 0);
-        // const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
         updateRotation();
         updateHeight();
       },
@@ -151,7 +149,7 @@
   // Function to apply rotation changes
   function updateRotation() {
     if (model) {
-      model.rotation.set(rotationX, rotationY, rotationZ, order)
+      model.rotation.set(rotationX, rotationY, rotationZ, order);
     }
   }
 
@@ -160,7 +158,7 @@
       ground.position.y = -height;
     }
     if (background) {
-      background.position.y = -height * 0.001;
+      background.position.y = -height * 0.002;
     }
   }
 
