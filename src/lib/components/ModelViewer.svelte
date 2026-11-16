@@ -8,6 +8,7 @@
     rotationX?: number;
     rotationY?: number;
     rotationZ?: number;
+    height?: number;
     scale?: number;
     order?: "XYZ" | "XZY" | "YXZ" | "YZX" | "ZXY" | "ZYX";
   }
@@ -17,6 +18,7 @@
     rotationX = 0, 
     rotationY = 0, 
     rotationZ = 0,
+    height = 0,
     scale = 1,
     order = "XYZ",
   }: Props = $props();
@@ -26,12 +28,15 @@
   let camera: THREE.PerspectiveCamera;
   let renderer: THREE.WebGLRenderer;
   let model: THREE.Group | undefined;
+  let ground: THREE.Group | undefined;
+  let background: THREE.Group | undefined;
   let animationFrameId: number;
   let pivot: THREE.Group | undefined;
 
   onMount(() => {
     const width = container.clientWidth || 300;
     const height = container.clientHeight || 350;
+    const textureLoader = new THREE.TextureLoader();
 
     // Initialize Scene, Camera, & Renderer
     scene = new THREE.Scene();
@@ -56,6 +61,37 @@
     backLight.position.set(-5, -5, -5);
     scene.add(backLight);
 
+    // Add Ground Objects
+    ground = new THREE.Group();
+    const groundTexture = textureLoader.load('/img/Grass.jpg');
+
+    const groudGeometry = new THREE.PlaneGeometry(20, 20);
+    const groundMaterial = new THREE.MeshBasicMaterial({ 
+      map: groundTexture,
+      side: THREE.DoubleSide 
+    });
+    let groundMesh = new THREE.Mesh(groudGeometry, groundMaterial);
+    groundMesh.rotateX(90);
+    groundMesh.position.set(0, -4, 0);
+
+    ground.add(groundMesh);
+    scene.add(ground);
+
+    // Add Background Objects
+    background = new THREE.Group();
+    const backgroundTexture = textureLoader.load('/img/gradientBackground.png');
+
+    const backgroundGeometry = new THREE.PlaneGeometry(20, 30);
+    const backgroundMaterial = new THREE.MeshBasicMaterial({
+      map: backgroundTexture,
+      side: THREE.DoubleSide
+    });
+    let backgroundMesh = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
+    backgroundMesh.position.set(0, 3, -10);
+
+    background.add(backgroundMesh);
+    scene.add(background);
+
     // Load GLB Model
     const loader = new GLTFLoader();
     loader.load(
@@ -69,8 +105,8 @@
         pivot.add(model);
         scene.add(pivot);
         camera.lookAt(0, 0, 0);
-        const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
         updateRotation();
+        updateHeight();
       },
       undefined,
       (error) => {
@@ -113,7 +149,16 @@
   // Function to apply rotation changes
   function updateRotation() {
     if (model) {
-      model.rotation.set(rotationX, rotationY, rotationZ, order)
+      model.rotation.set(rotationX, rotationY, rotationZ, order);
+    }
+  }
+
+  function updateHeight() {
+    if (ground) {
+      ground.position.y = -height;
+    }
+    if (background) {
+      background.position.y = -height * 0.002;
     }
   }
 
@@ -125,6 +170,11 @@
     order;
     updateRotation();
   });
+
+  $effect(() => {
+    height;
+    updateHeight();
+  })
 </script>
 
 <!-- Give the container an explicit height class so it never collapses to 0 -->
