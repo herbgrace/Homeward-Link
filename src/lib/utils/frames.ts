@@ -17,6 +17,14 @@ export interface Frame {
     fields: Field[];                 // what the grid displays, in order
     timeMs: number | null;           // for replay timing
     rotation: RocketMotion | null; // null = this frame has no orientation data
+    metrics?: Metrics | null,
+}
+
+// Used for the visualizers rather than finding the fields individually later
+interface Metrics {
+    speedMs: number | undefined,
+    altitudeM: number | undefined,
+    pressurePa: number | undefined,
 }
 
 export function FindField(frame: Frame | undefined, field: string): string | undefined {
@@ -123,11 +131,19 @@ export function snapshotToFrame(s: Snapshot): Frame {
     const add = (label: string, v: string | number | null | undefined) =>
         fields.push({ label, value: v == null ? "—" : String(v) });
 
+    let speedMs = ((): number => {
+        if (!k) {
+            return 0;
+        } else {
+            return parseFloat((k.speed / 16).toFixed(1));
+        }
+    })();
+
     add("Time", `${s.timeS.toFixed(2)} s`);
     add("State", k && (STATES[k.state] ?? k.state));
 
     add("Height", k && `${k.height} m`);
-    add("Speed", k && `${(k.speed / 16).toFixed(1)} m/s`);
+    add("Speed", k && `${speedMs} m/s`);
     add("Acceleration", k && `${(k.acceleration / 16).toFixed(1)} m/s²`);
 
     add("Pressure", imu && `${imu.pres} Pa`);
@@ -159,5 +175,10 @@ export function snapshotToFrame(s: Snapshot): Frame {
             rate: [imu.gyroX, imu.gyroY, imu.gyroZ].map((v) => v * GYRO_DPS_PER_LSB),
             tilt: imu.orient,
         } as RocketMotion : null,
+        metrics: {
+            speedMs: speedMs,
+            altitudeM: k?.height ?? 0,
+            pressurePa: imu?.pres ?? 0
+        }
     };
 }
