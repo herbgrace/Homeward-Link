@@ -66,6 +66,7 @@ $effect(() => {
             rotationX={modelPose.x}
             rotationY={modelPose.y}
             rotationZ={modelPose.z}
+            height={altitude}
             order={modelPose.order}
             scale={0.25}
         />
