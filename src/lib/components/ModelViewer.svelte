@@ -154,6 +154,7 @@
   }
 
   function updateHeight() {
+    // TODO - keep track of the starting height and only update based on that (in case starting height is not 0)
     if (ground) {
       ground.position.y = -height;
     }

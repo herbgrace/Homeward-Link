@@ -9,7 +9,7 @@ const baroAlt = (pa: number) => 44330.77 * (1 - Math.pow(pa / 101325, 0.190284))
 const STATES = ["startup", "idle", "pad", "boost", "fast", "coast", "drogue", "main", "landed", "invalid"];
 const MAX_DT_S = 0.5;   // don't integrate a stale rate across a gap of lost packets
 const ESP_GYRO_IN_RAD = true;   // Adafruit's example prints rad/s
-const GYRO_DPS_PER_LSB = 2000 / 32768;   // from the board's ±2000°/s spec, not checked on your unit
+const GYRO_DPS_PER_LSB = 2000 / 32768;   // from the MegaIMU board's ±2000°/s spec
 
 export interface Field { label: string; value: string }
 
@@ -75,6 +75,9 @@ const MS_HEADERS = ["relms", "currenttimemillis", "unixms"];
 const ROLL_HEADERS = ["roll", "x"];
 const PITCH_HEADERS = ["pitch", "y"];
 const YAW_HEADERS = ["yaw", "z"];
+const HEIGHT_HEADERS = ["height"]; //, "altitude"] // (Caused some errors since it takes into account the starting altitude)
+const SPEED_HEADERS = ["speed"];
+const PRESSURE_HEADERS = ["pressure"]
 
 /** `headers` is the block's first row; `rows` is everything after it. */
 export function csvToFrames(headers: string[], rows: string[][]): Frame[] {
@@ -92,6 +95,10 @@ export function csvToFrames(headers: string[], rows: string[][]): Frame[] {
                 : legacyIdx.some((i) => i !== -1) ? legacyIdx : null;
     const tiltIdx = lower.indexOf("tilt");
 
+    const heightIdx = find(HEIGHT_HEADERS);
+    const speedIdx = find(SPEED_HEADERS);
+    const pressureIdx = find(PRESSURE_HEADERS);
+
     return rows.map((row) => {
         const num = (i: number) => (i === -1 ? 0 : Number(row[i]) || 0);
         const motion: RocketMotion | null = rateIdx || tiltIdx !== -1
@@ -100,10 +107,19 @@ export function csvToFrames(headers: string[], rows: string[][]): Frame[] {
             : null;
         const t = timeIdx === -1 ? NaN : Number(row[timeIdx]);
 
+        const a = heightIdx === -1 ? undefined : Number(row[heightIdx]);
+        const s = speedIdx === -1 ? undefined : Number(row[speedIdx]) / 16; // TODO - determine units and only divide by 16 if using MegaKalman
+        const p = pressureIdx === -1 ? undefined : Number(row[pressureIdx]);
+
         return {
             fields: headers.map((h, i) => field(h, row[i] ?? "")),
             timeMs: Number.isFinite(t) ? t * timeScale : null,
-            rotation: motion
+            rotation: motion,
+            metrics: {
+                speedMs: s ?? 0,
+                altitudeM: a ?? 0,
+                pressurePa: p ?? 0
+            }
         };
     });
 }
@@ -121,7 +137,8 @@ export function liveESPToFrames(d: EspData): Frame {
         fields: live_columns.map((c) => field(c.label, d[c.key].toFixed(c.decimals))),
         timeMs: performance.now(),    // no device clock: stamp arrival time
         rotation: { rate: [-d.rotY * k, -d.rotX * k, d.rotZ * k] } as RocketMotion,
-        // Hardcoded for my ESP32 mounting... make variable?
+        // Hardcoded rotations for my ESP32 mounting... make variable?
+        // No speed, altitude, or pressure sensors locally, so no metrics field
     };
 }
 
