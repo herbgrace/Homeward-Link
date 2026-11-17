@@ -1,6 +1,5 @@
 # Homeward Link
-<img src="app-icon.png" width=100%, height=100px />
-Temporary Icon ^
+<img src="app-banner.jpg" width=100%, height=100px />
 
 `Homeward Link` lets you display telemetry data for live and past rocket flights. 
 
