@@ -7,7 +7,7 @@ export interface LinkInfo { rssiDbm: number; lqi: number; crcOk: boolean }
 
 export interface GpsFlags { nsats: number; valid: boolean; running: boolean; dateValid: boolean; courseValid: boolean }
 
-export interface GpsLocation {            // not "Location": that collides with the DOM type
+export interface GpsLocation { // not "Location": that collides with the DOM type
     flags: GpsFlags; altitude: number; latitude: number; longitude: number;
     year: number; month: number; day: number; hour: number; minute: number; second: number;
     pdop: number; hdop: number; vdop: number; mode: unknown;
@@ -34,7 +34,7 @@ export interface Config {
     apogeeDelay: number; mainDeploy: number; flightLogMax: number; callsign: number[]; version: number[];
 }
 
-export interface FlightState {            // Rust None arrives as null
+export interface FlightState { // Rust None arrives as null
     imu: MegaImu | null; kalman: MegaKalman | null; gps: GpsLocation | null;
     sats: Satellites | null; config: Config | null;
 }
@@ -53,7 +53,7 @@ export interface EspData {
     temperature: number;
 }
 
-// Single source of truth for order, labels, and formatting
+// Single source of truth for order, labels, and formatting - change if setup changes
 export const live_columns: { key: keyof EspData; label: string; decimals: number }[] = [
     { key: "accelX",      label: "Acceleration X", decimals: 2 },
     { key: "accelY",      label: "Acceleration Y", decimals: 2 },

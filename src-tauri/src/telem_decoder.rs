@@ -10,7 +10,9 @@ use crate::telem_models::{
 pub const PACKET_LEN: usize = 32; // Does not include length byte or checksum byte
 pub const PAYLOAD_LEN: usize = PACKET_LEN - 5; // 27 data bytes
 
-/// AltOS flight state 3 = boost (confirmed by your CSV).
+// #region Helper Structs
+
+/// AltOS flight state 3 = boost
 const STATE_BOOST: u8 = 3;
 /// Seconds of pad time to keep before the first boost report. AltOS keeps 2 seconds.
 pub const PAD_LEAD_S: f64 = 2.0;
@@ -118,6 +120,61 @@ impl Accumulator {
     }
 }
 
+// Struct to help with reading bytes in the array
+pub struct Cursor<'a> {
+    buf: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> Cursor<'a> {
+    pub fn new(buf: &'a [u8]) -> Self {
+        Self { buf, pos: 0 }
+    }
+
+    /// Take the next N bytes and advance
+    fn take<const N: usize>(&mut self) -> Result<[u8; N], DecodeError> {
+        let end = self.pos + N;
+        let bytes = self.buf.get(self.pos..end).ok_or(DecodeError::Truncated)?;
+        self.pos = end;
+        Ok(bytes.try_into().unwrap()) // safe: slice length is exactly N
+    }
+
+    pub fn u8(&mut self) -> Result<u8, DecodeError> {
+        Ok(self.take::<1>()?[0])
+    }
+    #[allow(dead_code)]
+    pub fn i8(&mut self) -> Result<i8, DecodeError> {
+        Ok(self.take::<1>()?[0] as i8)
+    }
+    pub fn u16(&mut self) -> Result<u16, DecodeError> {
+        Ok(u16::from_le_bytes(self.take()?))
+    }
+    pub fn i16(&mut self) -> Result<i16, DecodeError> {
+        Ok(i16::from_le_bytes(self.take()?))
+    }
+    pub fn i32(&mut self) -> Result<i32, DecodeError> {
+        Ok(i32::from_le_bytes(self.take()?))
+    }
+
+    /// Skip padding bytes
+    pub fn skip(&mut self, n: usize) -> Result<(), DecodeError> {
+        if self.pos + n > self.buf.len() {
+            return Err(DecodeError::Truncated);
+        }
+        self.pos += n;
+        Ok(())
+    }
+
+    pub fn finish(&self) {
+        debug_assert_eq!(self.pos, self.buf.len())
+    }
+    pub fn bytes<const N: usize>(&mut self) -> Result<[u8; N], DecodeError> {
+        self.take()
+    }
+}
+
+// #endregion
+
 /// Decode raw TELEM lines into merged snapshots.
 pub fn build_snapshots<I>(lines: I) -> (Vec<Snapshot>, LoadStats)
 where
@@ -171,58 +228,7 @@ fn set_relative_times(snaps: &mut Vec<Snapshot>) {
     snaps.retain(|s| s.time_s >= -PAD_LEAD_S);
 }
 
-// Struct to help with reading bytes in the array
-pub struct Cursor<'a> {
-    buf: &'a [u8],
-    pos: usize,
-}
-
-impl<'a> Cursor<'a> {
-    pub fn new(buf: &'a [u8]) -> Self {
-        Self { buf, pos: 0 }
-    }
-
-    /// Take the next N bytes and advance
-    fn take<const N: usize>(&mut self) -> Result<[u8; N], DecodeError> {
-        let end = self.pos + N;
-        let bytes = self.buf.get(self.pos..end).ok_or(DecodeError::Truncated)?;
-        self.pos = end;
-        Ok(bytes.try_into().unwrap()) // safe: slice length is exactly N
-    }
-
-    pub fn u8(&mut self) -> Result<u8, DecodeError> {
-        Ok(self.take::<1>()?[0])
-    }
-    #[allow(dead_code)]
-    pub fn i8(&mut self) -> Result<i8, DecodeError> {
-        Ok(self.take::<1>()?[0] as i8)
-    }
-    pub fn u16(&mut self) -> Result<u16, DecodeError> {
-        Ok(u16::from_le_bytes(self.take()?))
-    }
-    pub fn i16(&mut self) -> Result<i16, DecodeError> {
-        Ok(i16::from_le_bytes(self.take()?))
-    }
-    pub fn i32(&mut self) -> Result<i32, DecodeError> {
-        Ok(i32::from_le_bytes(self.take()?))
-    }
-
-    /// Skip padding bytes
-    pub fn skip(&mut self, n: usize) -> Result<(), DecodeError> {
-        if self.pos + n > self.buf.len() {
-            return Err(DecodeError::Truncated);
-        }
-        self.pos += n;
-        Ok(())
-    }
-
-    pub fn finish(&self) {
-        debug_assert_eq!(self.pos, self.buf.len())
-    }
-    pub fn bytes<const N: usize>(&mut self) -> Result<[u8; N], DecodeError> {
-        self.take()
-    }
-}
+// #region Packet Decoders
 
 /// What the TeleDongle appended/prepended (not part of the radio packet)
 #[derive(Serialize, Debug, Clone, Copy)]
@@ -557,6 +563,10 @@ impl PayloadDecode for Companion {
     }
 }
 
+// #endregion
+
+// #region Decoding Errors
+
 #[derive(Serialize, Debug)]
 pub enum DecodeError {
     BadPrefix, // line doesn't start with "TELEM "
@@ -605,6 +615,10 @@ impl fmt::Display for DecodeError {
         }
     }
 }
+
+// #endregion
+
+// #region Packet Parsing
 
 // line -> framing check -> header + payload bytes -> typed payload
 pub fn parse_line(line: &str) -> Result<Telemetry, DecodeError> {
@@ -756,6 +770,8 @@ fn decode_payload(type_id: u8, raw: &[u8; PAYLOAD_LEN]) -> Result<Payload, Decod
 
     Ok(payload_type)
 }
+
+// #endregion
 
 #[cfg(test)]
 mod tests {

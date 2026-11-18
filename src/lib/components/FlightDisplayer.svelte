@@ -4,7 +4,7 @@ import ModelViewer from "$lib/components/ModelViewer.svelte";
 import { type Frame, OrientationTracker, FindField } from "$lib/utils/frames";
 import { onDestroy } from "svelte";
 import { toModelPose } from "$lib/utils/modelPose";
-import ModelVisualizations from "./ModelVisualizations.svelte";
+import FlightVisualizations from "./FlightVisualizations.svelte";
 
 interface Props {
     dataUrl?: string,
@@ -30,21 +30,9 @@ let rocketPath = $state("/models/RussianRocket/RocketTweaked.glb");
 let rotation: number[] = $state([0, 0, 0]);
 let modelPose = $derived(toModelPose(rotation));
 
-let speed: number = $derived(
-    Number.parseFloat(
-        FindField(frame, 'speed')?.slice(0, -3) ?? '0'
-    ) // In m/s
-)
-let altitude: number = $derived(
-    Number.parseFloat(
-        FindField(frame, 'height')?.slice(0, -1) ?? '0'
-    )
-)
-let pressure: number = $derived(
-    Number.parseFloat(
-        FindField(frame, 'pressure')?.slice(0, -2) ?? '0'
-    ) * 0.01 // From Pa to hPa
-)
+let speed: number = $derived(frame?.metrics?.speedMs ?? 0);
+let altitude: number = $derived(frame?.metrics?.altitudeM ?? 0);
+let pressure: number = $derived(frame?.metrics?.pressurePa ?? 0);
 
 const tracker = new OrientationTracker();
 
@@ -71,12 +59,11 @@ $effect(() => {
             scale={0.25}
         />
         
-        <!-- TODO - Determine which axis is correct for roll/pitch -->
-        <ModelVisualizations 
-            rollVal={modelPose.x} // Roll in degrees
-            pitchVal={modelPose.y} // Pitch in degrees
-            vertSpeed={speed * 0.06} // Vertical speed in km/min for the vertical speed indicator
-            airspeedVal={speed * 60} // Air speed in meters/hour for an air speed indicator
+        <FlightVisualizations 
+            rollVal={rotation[0]} // Roll in degrees - (Around the rocket's nose axis)
+            pitchVal={rotation[1]} // Pitch in degrees - (The tilt from vertical)
+            vertSpeed={speed * 3.6} // Vertical speed in km/hour for the vertical speed indicator
+            airspeedVal={speed * 3.6} // Air speed in km/hour for an air speed indicator
             altVal={altitude} // Altitude in meters for an altimeter indicator
             pressureVal={pressure} // Pressure in hPa for an altimeter indicator
         />
@@ -143,7 +130,7 @@ $effect(() => {
         flex-direction: column;       
         gap: 1rem;                    
         width: 100%;
-        overflow-x: hidden; /* Prevents any child elements from breaking out horizontally */
+        overflow-x: hidden;
     }
 
     .sidebar > :global(*) {

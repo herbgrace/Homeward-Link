@@ -4,8 +4,6 @@
     interface Props {
         rollVal: number;
         pitchVal: number;
-        // turnVal: number;
-        // headingVal: number;
         vertSpeed: number;
         airspeedVal: number;
         altVal: number;
@@ -15,8 +13,6 @@
     let { 
         rollVal,
         pitchVal,
-        // turnVal,
-        // headingVal,
         vertSpeed,
         airspeedVal,
         altVal,
@@ -34,44 +30,35 @@
     $effect(() => {
         rollVal;
         pitchVal;
-        // turnVal;
-        // headingVal;
         vertSpeed;
         airspeedVal;
         altVal;
         pressureVal;
 
         visualizers.forEach(({ instance, node }) => {
-            // Safety check: ensure node is still in the DOM and instance exists
+            // Make sure node is still in the DOM and instance exists
             if (!instance || !node || !document.body.contains(node)) return;
 
             try {
                 switch (instance.type) {
-                    case "attitude": // Attitude
+                    case "attitude":
                         instance.updateRoll(rollVal);
                         instance.updatePitch(pitchVal);
                         break;
-                    case "altimeter": // Altimeter
+                    case "altimeter":
                         instance.updateAltitude(altVal);
                         instance.updatePressure(pressureVal);
                         break;
-                    case "vertical": // Vertical
+                    case "vertical":
                         instance.updateVerticalSpeed(vertSpeed);
                         break;
-                    // case POSSIBLE_TYPES[3]: // Coordinator
-                    //     instance.updateCoordinator(turnVal);
-                    //     break;
-                    // case POSSIBLE_TYPES[4]: // Heading
-                    //     instance.updateHeading(headingVal);
-                    //     break;
-                    case "airspeed": // Airspeed
+                    case "airspeed":
                         instance.updateAirSpeed(airspeedVal);
                         break;
                     default:
                         break;
                 }
             } catch (e) {
-                // Catch any stray DOM update errors gracefully
                 console.error("Error updating flight indicator:", e);
             }
         });
@@ -95,7 +82,6 @@ function initIndicator(node: HTMLElement, initialType: string) {
             imagesDirectory: "/img/visualizations",
         });
 
-        // Assign type to instance for reference if needed
         instance.type = type;
 
         currentRecord = { instance, node };

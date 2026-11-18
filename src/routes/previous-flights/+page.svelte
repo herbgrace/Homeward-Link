@@ -7,7 +7,6 @@ let statusMessage: string = $state('Loading Files...');
 let loadedFiles: string[] = $state([]);
 
 async function refreshEntries() {
-    // console.log("Hit the refresh entries method")
     let response = await loadEntries();
     loadedFiles = response.data;
     statusMessage = response.errorMessage;
@@ -27,6 +26,10 @@ function clickEntry(entryIndex: number) {
 
 refreshEntries();
 </script>
+
+<svelte:head>
+    <title>Previous Flights</title>
+</svelte:head>
 
 <main class="container">
 <title>Previous Flights</title>

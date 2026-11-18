@@ -63,7 +63,7 @@
 
     // Add Ground Objects
     ground = new THREE.Group();
-    const groundTexture = textureLoader.load('/img/Grass.jpg');
+    const groundTexture = textureLoader.load('/img/textures/Grass.jpg');
 
     const groudGeometry = new THREE.PlaneGeometry(20, 20);
     const groundMaterial = new THREE.MeshBasicMaterial({ 
@@ -79,7 +79,7 @@
 
     // Add Background Objects
     background = new THREE.Group();
-    const backgroundTexture = textureLoader.load('/img/gradientBackground.png');
+    const backgroundTexture = textureLoader.load('/img/textures/gradientBackground.png');
 
     const backgroundGeometry = new THREE.PlaneGeometry(20, 30);
     const backgroundMaterial = new THREE.MeshBasicMaterial({
@@ -154,6 +154,7 @@
   }
 
   function updateHeight() {
+    // TODO - keep track of the starting height and only update based on that (in case starting height is not 0)
     if (ground) {
       ground.position.y = -height;
     }
@@ -162,7 +163,6 @@
     }
   }
 
-  // React to prop changes from the parent component
   $effect(() => {
     rotationX;
     rotationY;

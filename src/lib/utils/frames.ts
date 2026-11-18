@@ -9,14 +9,22 @@ const baroAlt = (pa: number) => 44330.77 * (1 - Math.pow(pa / 101325, 0.190284))
 const STATES = ["startup", "idle", "pad", "boost", "fast", "coast", "drogue", "main", "landed", "invalid"];
 const MAX_DT_S = 0.5;   // don't integrate a stale rate across a gap of lost packets
 const ESP_GYRO_IN_RAD = true;   // Adafruit's example prints rad/s
-const GYRO_DPS_PER_LSB = 2000 / 32768;   // from the board's ±2000°/s spec, not checked on your unit
+const GYRO_DPS_PER_LSB = 2000 / 32768;   // from the MegaIMU board's ±2000°/s spec
 
 export interface Field { label: string; value: string }
 
 export interface Frame {
-    fields: Field[];                 // what the grid displays, in order
-    timeMs: number | null;           // for replay timing
+    fields: Field[];
+    timeMs: number | null; // for replay timing
     rotation: RocketMotion | null; // null = this frame has no orientation data
+    metrics?: Metrics | null,
+}
+
+// Used for the visualizers rather than finding the fields individually later
+interface Metrics {
+    speedMs: number | undefined,
+    altitudeM: number | undefined,
+    pressurePa: number | undefined,
 }
 
 export function FindField(frame: Frame | undefined, field: string): string | undefined {
@@ -27,8 +35,8 @@ export function FindField(frame: Frame | undefined, field: string): string | und
 
 export class OrientationTracker {
     private lastMs: number | null = null;
-    private lastRate = [0, 0, 0];   // °/s, held until the next sample
-    private pose = [0, 0, 0];
+    private lastRate = [0, 0, 0]; // °/s, held until the next sample
+    private pose = [0, 0, 0]; // Actual ° measurement for posing the model
 
     reset() { this.lastMs = null; this.lastRate = [0, 0, 0]; this.pose = [0, 0, 0]; }
 
@@ -60,13 +68,16 @@ export interface Status {
 
 const field = (label: string, value: string | number): Field => ({ label, value: String(value) });
 
-// ───────────── CSV ─────────────
+// ----------- CSV -----------
 
 const SECOND_HEADERS = ["unixtime", "relseconds", "time"];
 const MS_HEADERS = ["relms", "currenttimemillis", "unixms"];
 const ROLL_HEADERS = ["roll", "x"];
 const PITCH_HEADERS = ["pitch", "y"];
 const YAW_HEADERS = ["yaw", "z"];
+const HEIGHT_HEADERS = ["height"]; //, "alt", "altitude"] // (Caused some errors since it's the starting alt + gained alt)
+const SPEED_HEADERS = ["speed"];
+const PRESSURE_HEADERS = ["pressure"]
 
 /** `headers` is the block's first row; `rows` is everything after it. */
 export function csvToFrames(headers: string[], rows: string[][]): Frame[] {
@@ -84,6 +95,10 @@ export function csvToFrames(headers: string[], rows: string[][]): Frame[] {
                 : legacyIdx.some((i) => i !== -1) ? legacyIdx : null;
     const tiltIdx = lower.indexOf("tilt");
 
+    const heightIdx = find(HEIGHT_HEADERS);
+    const speedIdx = find(SPEED_HEADERS);
+    const pressureIdx = find(PRESSURE_HEADERS);
+
     return rows.map((row) => {
         const num = (i: number) => (i === -1 ? 0 : Number(row[i]) || 0);
         const motion: RocketMotion | null = rateIdx || tiltIdx !== -1
@@ -92,10 +107,19 @@ export function csvToFrames(headers: string[], rows: string[][]): Frame[] {
             : null;
         const t = timeIdx === -1 ? NaN : Number(row[timeIdx]);
 
+        const a = heightIdx === -1 ? undefined : Number(row[heightIdx]);
+        const s = speedIdx === -1 ? undefined : Number(row[speedIdx]) / 16; // TODO - determine units and only divide by 16 if using MegaKalman
+        const p = pressureIdx === -1 ? undefined : Number(row[pressureIdx]);
+
         return {
             fields: headers.map((h, i) => field(h, row[i] ?? "")),
             timeMs: Number.isFinite(t) ? t * timeScale : null,
-            rotation: motion
+            rotation: motion,
+            metrics: {
+                speedMs: s ?? 0,
+                altitudeM: a ?? 0,
+                pressurePa: p ?? 0
+            }
         };
     });
 }
@@ -103,7 +127,7 @@ export function csvToFrames(headers: string[], rows: string[][]): Frame[] {
 export function liveToFrame(t: LiveTelemetry): Frame {
     switch (t.kind) {
         case "esp":        return liveESPToFrames(t.data);
-        case "teleDongle": return snapshotToFrame(t.data);   // same renderer as file replay
+        case "teleDongle": return snapshotToFrame(t.data); // same renderer as file replay
     }
 }
 
@@ -113,7 +137,8 @@ export function liveESPToFrames(d: EspData): Frame {
         fields: live_columns.map((c) => field(c.label, d[c.key].toFixed(c.decimals))),
         timeMs: performance.now(),    // no device clock: stamp arrival time
         rotation: { rate: [-d.rotY * k, -d.rotX * k, d.rotZ * k] } as RocketMotion,
-        // Hardcoded for my ESP32 mounting... make variable?
+        // Hardcoded rotations for my ESP32 mounting... make variable?
+        // No speed, altitude, or pressure sensors locally, so no metrics field
     };
 }
 
@@ -123,11 +148,19 @@ export function snapshotToFrame(s: Snapshot): Frame {
     const add = (label: string, v: string | number | null | undefined) =>
         fields.push({ label, value: v == null ? "—" : String(v) });
 
+    let speedMs = ((): number => {
+        if (!k) {
+            return 0;
+        } else {
+            return parseFloat((k.speed / 16).toFixed(1));
+        }
+    })();
+
     add("Time", `${s.timeS.toFixed(2)} s`);
     add("State", k && (STATES[k.state] ?? k.state));
 
     add("Height", k && `${k.height} m`);
-    add("Speed", k && `${(k.speed / 16).toFixed(1)} m/s`);
+    add("Speed", k && `${speedMs} m/s`);
     add("Acceleration", k && `${(k.acceleration / 16).toFixed(1)} m/s²`);
 
     add("Pressure", imu && `${imu.pres} Pa`);
@@ -159,5 +192,10 @@ export function snapshotToFrame(s: Snapshot): Frame {
             rate: [imu.gyroX, imu.gyroY, imu.gyroZ].map((v) => v * GYRO_DPS_PER_LSB),
             tilt: imu.orient,
         } as RocketMotion : null,
+        metrics: {
+            speedMs: speedMs,
+            altitudeM: k?.height ?? 0,
+            pressurePa: imu?.pres ?? 0
+        }
     };
 }
