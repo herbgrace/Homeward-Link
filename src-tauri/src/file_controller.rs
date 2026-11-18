@@ -23,7 +23,7 @@ impl FlightData {
 
 #[tauri::command]
 pub async fn get_all_saved_flights(state: tauri::State<'_, state_controller::AppState>) -> Result<Vec<String>, String> {
-    let supported_extensions = ["csv", "telem", "eeprom"];
+    let supported_extensions = ["csv", "telem"]; //, "eeprom"]; (eeprom is not actually supported yet)
 
     // Reset the current block since user isn't looking at a specific flight
     state_controller::reset_current_block(&state)?;

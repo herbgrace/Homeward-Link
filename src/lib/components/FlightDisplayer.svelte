@@ -62,7 +62,7 @@ $effect(() => {
         <FlightVisualizations 
             rollVal={rotation[0]} // Roll in degrees - (Around the rocket's nose axis)
             pitchVal={rotation[1]} // Pitch in degrees - (The tilt from vertical)
-            vertSpeed={speed * 0.06} // Vertical speed in km/min for the vertical speed indicator
+            vertSpeed={speed * 3.6} // Vertical speed in km/hour for the vertical speed indicator
             airspeedVal={speed * 3.6} // Air speed in km/hour for an air speed indicator
             altVal={altitude} // Altitude in meters for an altimeter indicator
             pressureVal={pressure} // Pressure in hPa for an altimeter indicator

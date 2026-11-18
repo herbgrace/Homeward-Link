@@ -63,7 +63,7 @@
 
     // Add Ground Objects
     ground = new THREE.Group();
-    const groundTexture = textureLoader.load('/img/Grass.jpg');
+    const groundTexture = textureLoader.load('/img/textures/Grass.jpg');
 
     const groudGeometry = new THREE.PlaneGeometry(20, 20);
     const groundMaterial = new THREE.MeshBasicMaterial({ 
@@ -79,7 +79,7 @@
 
     // Add Background Objects
     background = new THREE.Group();
-    const backgroundTexture = textureLoader.load('/img/gradientBackground.png');
+    const backgroundTexture = textureLoader.load('/img/textures/gradientBackground.png');
 
     const backgroundGeometry = new THREE.PlaneGeometry(20, 30);
     const backgroundMaterial = new THREE.MeshBasicMaterial({

@@ -75,7 +75,7 @@ const MS_HEADERS = ["relms", "currenttimemillis", "unixms"];
 const ROLL_HEADERS = ["roll", "x"];
 const PITCH_HEADERS = ["pitch", "y"];
 const YAW_HEADERS = ["yaw", "z"];
-const HEIGHT_HEADERS = ["height"]; //, "altitude"] // (Caused some errors since it takes into account the starting altitude)
+const HEIGHT_HEADERS = ["height"]; //, "alt", "altitude"] // (Caused some errors since it takes into account the starting altitude)
 const SPEED_HEADERS = ["speed"];
 const PRESSURE_HEADERS = ["pressure"]
 
