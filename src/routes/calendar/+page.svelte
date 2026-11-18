@@ -7,6 +7,10 @@ import { Calendar } from "$lib/components/ui/calendar/index.js";
 let value = $state<CalendarDate | undefined>(today(getLocalTimeZone()));
 </script>
 
+<svelte:head>
+    <title>Calendar</title>
+</svelte:head>
+
 <main class="container">
 <title>Calendar</title>
 <NavigationBar />

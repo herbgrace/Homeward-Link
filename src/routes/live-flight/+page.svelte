@@ -32,6 +32,10 @@ async function pauseReplay() {
 
 </script>
 
+<svelte:head>
+    <title>Live Flight</title>
+</svelte:head>
+
 <main class="container">
 <title>Live Flight</title>
 <NavigationBar />

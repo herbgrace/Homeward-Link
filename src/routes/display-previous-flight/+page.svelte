@@ -48,6 +48,9 @@ async function stop_replay() {
 }
 </script>
 
+<svelte:head>
+    <title>Previous Flight</title>
+</svelte:head>
 
 <main class="main-content">
     {#if isLoading}

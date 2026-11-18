@@ -28,6 +28,10 @@ function clickEntry(entryIndex: number) {
 refreshEntries();
 </script>
 
+<svelte:head>
+    <title>Previous Flights</title>
+</svelte:head>
+
 <main class="container">
 <title>Previous Flights</title>
 <NavigationBar settingsRefresh={refreshEntries}/> 
