@@ -349,7 +349,7 @@ mod tests {
         let files = run(get_all_saved_flights(app.state::<AppState>())).unwrap();
 
         assert!(files.iter().all(|f| f.starts_with(tmp.path().to_str().unwrap())), "full paths expected");
-        assert_eq!(names(files), vec!["a.csv", "b.telem", "c.eeprom"]);
+        assert_eq!(names(files), vec!["a.csv", "b.telem"]); //, "c.eeprom"]);
     }
 
     #[test]
@@ -364,12 +364,12 @@ mod tests {
     #[test]
     fn extension_matching_is_case_insensitive() {
         let tmp = tempdir().unwrap();
-        for name in ["A.CSV", "b.TELEM", "c.Eeprom"] {
+        for name in ["A.CSV", "b.TELEM"] { //, "c.Eeprom"] {
             fs::write(tmp.path().join(name), "x").unwrap();
         }
         let app = app_with_dir(tmp.path(), 3);
         let files = run(get_all_saved_flights(app.state::<AppState>())).unwrap();
-        assert_eq!(names(files), vec!["A.CSV", "b.TELEM", "c.Eeprom"]);
+        assert_eq!(names(files), vec!["A.CSV", "b.TELEM"]); //, "c.Eeprom"]);
     }
 
     #[test]

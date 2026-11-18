@@ -5,12 +5,12 @@
     const features = [
         {
             title: "Replay past flights",
-            text: "Open a .telem or .csv log and watch the flight play back: altitude, speed, GPS, battery and more.",
+            text: "Open a .telem or .csv log and watch the flight play back with all of its included telemetry.",
             img: "/img/home/replay.png",
         },
         {
             title: "Track live",
-            text: "Plug in a TeleDongle and see telemetry the moment it arrives, with signal strength alongside.",
+            text: "Plug in a wireless receiver and see telemetry the moment it arrives.",
             img: "/img/home/live.png",
         },
         {
@@ -21,7 +21,7 @@
     ];
 
     const steps = [
-        "Connect your TeleDongle, or pick a saved flight log.",
+        "Connect your telemetry receiver, or pick a saved flight log.",
         "Choose Live Flight or open a flight from Previous Flights.",
         "Press Play and follow the data.",
     ];
