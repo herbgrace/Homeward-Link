@@ -14,8 +14,8 @@ const GYRO_DPS_PER_LSB = 2000 / 32768;   // from the MegaIMU board's ±2000°/s 
 export interface Field { label: string; value: string }
 
 export interface Frame {
-    fields: Field[];                 // what the grid displays, in order
-    timeMs: number | null;           // for replay timing
+    fields: Field[];
+    timeMs: number | null; // for replay timing
     rotation: RocketMotion | null; // null = this frame has no orientation data
     metrics?: Metrics | null,
 }
@@ -35,8 +35,8 @@ export function FindField(frame: Frame | undefined, field: string): string | und
 
 export class OrientationTracker {
     private lastMs: number | null = null;
-    private lastRate = [0, 0, 0];   // °/s, held until the next sample
-    private pose = [0, 0, 0];
+    private lastRate = [0, 0, 0]; // °/s, held until the next sample
+    private pose = [0, 0, 0]; // Actual ° measurement for posing the model
 
     reset() { this.lastMs = null; this.lastRate = [0, 0, 0]; this.pose = [0, 0, 0]; }
 
@@ -68,14 +68,14 @@ export interface Status {
 
 const field = (label: string, value: string | number): Field => ({ label, value: String(value) });
 
-// ───────────── CSV ─────────────
+// ----------- CSV -----------
 
 const SECOND_HEADERS = ["unixtime", "relseconds", "time"];
 const MS_HEADERS = ["relms", "currenttimemillis", "unixms"];
 const ROLL_HEADERS = ["roll", "x"];
 const PITCH_HEADERS = ["pitch", "y"];
 const YAW_HEADERS = ["yaw", "z"];
-const HEIGHT_HEADERS = ["height"]; //, "alt", "altitude"] // (Caused some errors since it takes into account the starting altitude)
+const HEIGHT_HEADERS = ["height"]; //, "alt", "altitude"] // (Caused some errors since it's the starting alt + gained alt)
 const SPEED_HEADERS = ["speed"];
 const PRESSURE_HEADERS = ["pressure"]
 
@@ -127,7 +127,7 @@ export function csvToFrames(headers: string[], rows: string[][]): Frame[] {
 export function liveToFrame(t: LiveTelemetry): Frame {
     switch (t.kind) {
         case "esp":        return liveESPToFrames(t.data);
-        case "teleDongle": return snapshotToFrame(t.data);   // same renderer as file replay
+        case "teleDongle": return snapshotToFrame(t.data); // same renderer as file replay
     }
 }
 

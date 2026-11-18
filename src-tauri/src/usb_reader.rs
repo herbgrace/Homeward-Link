@@ -127,7 +127,7 @@ const PROFILES: &[DeviceProfile] = &[
         name: "TeleDongle",
         matches: |i| product_contains(i, "teledongle") || (i.vid == 0xFFFE && i.pid == 0x000C),
         baud: 115_200,
-        init: None,  // fill in once you've confirmed the monitor command
+        init: None,  // TODO - determine if TeleDongle has a monitor command & replace when known
         decoder: teledongle_decoder, 
         altos: true
     },

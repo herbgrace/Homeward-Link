@@ -163,7 +163,6 @@
     }
   }
 
-  // React to prop changes from the parent component
   $effect(() => {
     rotationX;
     rotationY;

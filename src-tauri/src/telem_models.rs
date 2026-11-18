@@ -229,7 +229,7 @@ pub struct MiniSensor {
     pub speed: i16,        // m/s * 16
     pub height: i16,       // m
     pub ground_pres: i32,  // Average Barometer Reading on Ground
-                       // 4 bytes of padding
+    // 4 bytes of padding
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -245,7 +245,7 @@ pub struct MetrumSensor {
     pub v_batt: i16,       // Battery Voltage
     pub sense_d: i16,      // Drogue Continuity Sense
     pub sense_m: i16,      // Main Continuity Sense
-                       // 6 Bytes of padding
+    // 6 Bytes of padding
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -256,5 +256,5 @@ pub struct MetrumCalibration {
     pub ground_accel: i16, // Average Accelerometer Reading on Ground
     pub accel_plus_g: i16, // Accel calibration at +1g
     pub accel_minus_g: i16, // Accel calibration at -1g
-                       // 14 bytes of padding
+    // 14 bytes of padding
 }

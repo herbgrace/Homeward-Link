@@ -21,7 +21,7 @@ let reachedEnd: boolean = $derived(
 );
 
 export async function init_manager(path: string) {
-    reset_manager();           // clears blocks + the tick clock from any previous file
+    reset_manager(); // clears blocks + the tick clock from any previous file
     filePath = path;
     await load_new_block();
     usingFirst = !usingFirst;
@@ -60,7 +60,6 @@ export function get_current_frame_and_increment(): Frame | undefined {
 export function get_next_frame_and_increment(): Frame | undefined {
     const frame = get_next_frame();
     increment_counter();
-    // console.log("Getting the next frame and incrementing!");
     return frame;
 }
 
@@ -97,7 +96,7 @@ async function load_new_block() {
 
     let frames: Frame[];
     if (res.kind === 'table') {
-        const [headers = [], ...rows] = res.data;       // row 0 of every block is the header
+        const [headers = [], ...rows] = res.data; // row 0 of every block is the header
         frames = csvToFrames(headers, rows);
     } else {
         frames = res.data.snapshots.map(snapshotToFrame);

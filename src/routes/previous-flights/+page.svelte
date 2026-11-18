@@ -7,7 +7,6 @@ let statusMessage: string = $state('Loading Files...');
 let loadedFiles: string[] = $state([]);
 
 async function refreshEntries() {
-    // console.log("Hit the refresh entries method")
     let response = await loadEntries();
     loadedFiles = response.data;
     statusMessage = response.errorMessage;
