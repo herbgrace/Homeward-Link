@@ -45,6 +45,23 @@ In order to run locally, you only need to install [Rust](https://rust-lang.org/t
 - Find the latest release (At the top)
 - Download and run the correct installer for your Operating System
 
+If you're unsure of the correct installer for your system, here's a quick guide:
+
+##### Windows
+- x64_en-US.msi
+- x64-setup.exe
+
+##### macOS
+- aarch64.app.tar.gz
+- aarch64.dmg
+- x64.app.tar.gz
+- x64.dmg
+
+##### Linux
+- x86_64.rpm
+- amd64.AppImage
+- amd64.deb
+
 #### Method 2: Building an Installer Locally
 Make sure you have installed npm and other required technologies
 ```bash
