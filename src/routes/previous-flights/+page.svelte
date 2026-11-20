@@ -14,7 +14,7 @@ async function refreshEntries() {
 
 function clickEntry(entryIndex: number) {
     if (entryIndex < 0 || entryIndex >= loadedFiles.length) {
-        console.log("Tried to load a flight that was out of bound of the saved array")
+        console.error("Tried to load a flight that was out of bound of the saved array")
         statusMessage = "Unable to load saved flight"
         return;
     }

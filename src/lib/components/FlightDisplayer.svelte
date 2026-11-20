@@ -1,8 +1,8 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
 import ModelViewer from "$lib/components/ModelViewer.svelte";
-import { type Frame, OrientationTracker, FindField } from "$lib/utils/frames";
-import { onDestroy } from "svelte";
+import { type Frame, OrientationTracker } from "$lib/utils/frames";
+import { onDestroy, untrack } from "svelte";
 import { toModelPose } from "$lib/utils/modelPose";
 import FlightVisualizations from "./FlightVisualizations.svelte";
 
@@ -29,10 +29,27 @@ let fileName = $derived(dataUrl?.split(/[\\/]/).at(-1))   // works with / and \ 
 let rocketPath = $state("/models/RussianRocket/RocketTweaked.glb");
 let rotation: number[] = $state([0, 0, 0]);
 let modelPose = $derived(toModelPose(rotation));
+let startingAlt = $state(-1);
 
-let speed: number = $derived(frame?.metrics?.speedMs ?? 0);
-let altitude: number = $derived(frame?.metrics?.altitudeM ?? 0);
-let pressure: number = $derived(frame?.metrics?.pressurePa ?? 0);
+// Keep the previous value if the new one is undefined, default to 0 for first values
+let speed: number = $derived.by((prev = 0) => {
+    if (frame?.metrics?.speedMs) {
+        return frame.metrics.speedMs;
+    }
+    return prev;
+});
+let currentAlt: number = $derived.by((prev = startingAlt) => {
+    if (frame?.metrics?.altitudeM) {
+        return frame.metrics.altitudeM - startingAlt;
+    } 
+    return prev;
+});
+let pressure: number  = $derived.by((prev = 0) => {
+    if (frame?.metrics?.pressurePa) {
+        return frame.metrics.pressurePa;
+    }
+    return prev;
+});
 
 const tracker = new OrientationTracker();
 
@@ -44,6 +61,9 @@ onDestroy(() => {
 // Frames without orientation data (e.g. GPS packets) keep the last known pose
 $effect(() => {
     if (frame) rotation = tracker.update(frame);
+    if (startingAlt == -1 && frame?.metrics?.altitudeM != undefined) {
+        startingAlt = frame.metrics.altitudeM;
+    }
 });
 </script>
 
@@ -54,7 +74,7 @@ $effect(() => {
             rotationX={modelPose.x}
             rotationY={modelPose.y}
             rotationZ={modelPose.z}
-            height={altitude}
+            height={currentAlt}
             order={modelPose.order}
             scale={0.25}
         />
@@ -64,7 +84,7 @@ $effect(() => {
             pitchVal={rotation[1]} // Pitch in degrees - (The tilt from vertical)
             vertSpeed={speed * 3.6} // Vertical speed in km/hour for the vertical speed indicator
             airspeedVal={speed * 3.6} // Air speed in km/hour for an air speed indicator
-            altVal={altitude} // Altitude in meters for an altimeter indicator
+            altVal={currentAlt} // Altitude in meters for an altimeter indicator
             pressureVal={pressure} // Pressure in hPa for an altimeter indicator
         />
     </div>

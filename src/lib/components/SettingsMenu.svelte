@@ -31,7 +31,7 @@ async function changeDataPath() {
 
     if (path == null) {
         // User closed the dialog, no need to update anything
-        console.log("Update dialog closed")
+        // console.log("Update dialog closed")
         return;
     }
 

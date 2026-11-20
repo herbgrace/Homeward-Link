@@ -15,7 +15,7 @@ let { settingsRefresh = () => {} } = $props();
 function handleClick(index: number) {
     activeId = index;
     let reroute = paths[index].toLowerCase();
-    console.log("Rerouting to: " + reroute)
+    // console.log("Rerouting to: " + reroute)
     goto(paths[index].toLowerCase())
 }
 </script>
