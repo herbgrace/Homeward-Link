@@ -40,16 +40,11 @@
 <div class="page">
     <section class="hero">
         <div class="hero-text">
-            <span class="eyebrow">Telemetry for Altus Metrum flight computers</span>
             <h1>Follow your rocket from the <span class="accent">pad</span> to the field.</h1>
             <p class="lead">
-                Live telemetry and flight replay in one place — with a 3D view of the rocket and
-                cockpit-style instruments.
+                Live telemetry and flight replay in one place, built for Altus Metrum
+                flight computers.
             </p>
-            <div class="cta">
-                <a class="btn btn-primary btn-lg" href="/previous-flights"><FolderClock size={16} />Open a previous flight</a>
-                <a class="btn btn-lg" href="/live-flight"><Radio size={16} />Go live</a>
-            </div>
         </div>
         <div class="hero-image">
             <ImageSlot src="/img/home/hero.png" alt="Homeward Link logo" ratio="4 / 5" label="Hero image: Homeward Link Logo (4:5)" />
@@ -124,16 +119,6 @@
         align-items: center;
     }
 
-    .eyebrow {
-        display: inline-block;
-        padding: 0.25rem 0.65rem;
-        border-radius: 999px;
-        background: var(--accent-soft);
-        color: var(--accent-text);
-        font-size: 12px;
-        font-weight: 600;
-    }
-
     h1 {
         margin-top: 1rem;
         font-size: clamp(2rem, 4vw, 3rem);
@@ -152,13 +137,10 @@
         line-height: 1.6;
     }
 
-    .cta { display: flex; gap: 0.6rem; margin-top: 1.75rem; flex-wrap: wrap; }
-    .btn-lg { height: 40px; padding: 0 1.1rem; font-size: 14px; }
-    .cta a:hover { text-decoration: none; }
-
     .hero-image :global(img), .hero-image :global(.placeholder) {
         border-radius: var(--radius-lg);
         box-shadow: var(--shadow-md);
+        max-height: 20rem;
     }
 
     /* Sections */

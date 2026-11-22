@@ -86,7 +86,7 @@ let pressure: number  = $derived.by((prev = 0) => {
     return prev;
 });
 
-// Sources without these sensors (e.g. the ESP32 test board) show "—" instead of a fake 0
+// Sources without these sensors (e.g. the ESP32 test board) show "-" instead of a fake 0
 let hasMetrics = $derived(frame?.metrics != undefined);
 let displayAlt = $derived(hasMetrics ? Math.max(currentAlt, 0) : undefined);
 let viewerHeight = $derived(Math.max(currentAlt, 0));
@@ -241,7 +241,7 @@ let visibleViews = $derived(visualLayout === "single" ? 1 : visualLayout === "fo
                             {#each frame.fields as f}
                                 <div class="cell">
                                     <dt>{f.label}</dt>
-                                    <dd class="tabular">{f.value === "" ? "—" : f.value}</dd>
+                                    <dd class="tabular">{f.value === "" ? "-" : f.value}</dd>
                                 </div>
                             {/each}
                         </dl>

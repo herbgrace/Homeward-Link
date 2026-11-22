@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Homeward Link — design tokens + base styles
+   Homeward Link - design tokens + base styles
    Dark mode: graphite greys with the signature orange.
    Light mode: warm off-white surfaces with a deeper orange for contrast.
    Theme follows the OS unless <html data-theme="light|dark"> is set.
@@ -83,7 +83,7 @@
     --ring: var(--accent-ring);
 }
 
-/* Dark tokens — applied for OS dark mode (unless forced light) and for forced dark */
+/* Dark tokens - applied for OS dark mode (unless forced light) and for forced dark */
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
         color-scheme: dark;

@@ -13,7 +13,7 @@
     let { altitude, speed, pressure, tilt, roll, variant = "tiles" }: Props = $props();
 
     const fmt = (v: number | undefined, digits = 1) =>
-        v == undefined || !Number.isFinite(v) ? "—" : v.toFixed(digits);
+        v == undefined || !Number.isFinite(v) ? "-" : v.toFixed(digits);
 
     const normalizeDeg = (d: number) => ((d % 360) + 540) % 360 - 180;
 
@@ -34,7 +34,7 @@
                 {m.label}
             </div>
             <div class="value tabular">
-                {m.value}<span class="unit">{m.value === "—" ? "" : m.unit}</span>
+                {m.value}<span class="unit">{m.value === "-" ? "" : m.unit}</span>
             </div>
         </div>
     {/each}

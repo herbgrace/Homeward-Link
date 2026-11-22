@@ -199,7 +199,7 @@ $effect(() => {
                                 {#if flight.modifiedMs}
                                     {dateFormat.format(flight.modifiedMs)}
                                     <span class="time">{timeFormat.format(flight.modifiedMs)}</span>
-                                {:else}—{/if}
+                                {:else}-{/if}
                             </span>
                             <span class="col-size muted tabular">{formatBytes(flight.sizeBytes)}</span>
                             <span class="open"><span class="open-label">Open</span><ChevronRight size={16} /></span>

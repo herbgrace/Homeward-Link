@@ -76,7 +76,7 @@
     backLight.position.set(-5, -5, -5);
     scene.add(backLight);
 
-    // Sky dome — a vertical gradient that works from every camera angle and shifts toward space with altitude
+    // Sky dome - a vertical gradient that works from every camera angle and shifts toward space with altitude
     const skyUniforms = {
       zenith: { value: SKY.zenithLow.clone() },
       horizon: { value: SKY.horizonLow.clone() },
@@ -189,7 +189,7 @@
     let controls: OrbitControls | undefined;
     let activeMode: CameraMode | undefined;
     const origin = new THREE.Vector3(0, 0, 0);
-    const clock = new THREE.Clock();
+    const clock = new THREE.Timer();
 
     function setMode(mode: CameraMode) {
       activeMode = mode;
@@ -275,7 +275,7 @@
       animationFrameId = requestAnimationFrame(animate);
       if (cameraMode !== activeMode) setMode(cameraMode);
       const groundY = updateEnvironment();
-      updateCamera(cameraMode, clock.getElapsedTime(), groundY);
+      updateCamera(cameraMode, clock.getElapsed(), groundY);
       sky.position.copy(camera.position);
       stars.position.copy(camera.position);
       renderer.render(scene, camera);
@@ -296,7 +296,7 @@
     });
     resizeObserver.observe(container);
 
-    // Cleanup on destroy — release the WebGL context so switching layouts doesn't leak contexts
+    // Cleanup on destroy - release the WebGL context so switching layouts doesn't leak contexts
     return () => {
       resizeObserver.disconnect();
       cancelAnimationFrame(animationFrameId);
