@@ -1,16 +1,18 @@
 <script lang="ts">
 import { page } from "$app/state";
 import { onMount, onDestroy } from "svelte";
+import { LoaderCircle } from "@lucide/svelte";
 
-import {    
-    init_manager, 
-    reset_manager, 
+import {
+    init_manager,
+    reset_manager,
     determine_waiting_period,
     get_current_frame_and_increment,
     get_next_frame_and_increment,
 } from "$lib/utils/blockManager.svelte"
 
 import FlightDisplayer from "$lib/components/FlightDisplayer.svelte";
+import { fileNameOf } from "$lib/utils/savedFlightUtils";
 import type { Frame } from "$lib/utils/frames";
 
 let filePath: string = $state(page.url.searchParams.get('filePath') || "");
@@ -49,20 +51,34 @@ async function stop_replay() {
 </script>
 
 <svelte:head>
-    <title>Previous Flight</title>
+    <title>{fileNameOf(filePath) || "Previous Flight"} · Homeward Link</title>
 </svelte:head>
 
-<main class="main-content">
-    {#if isLoading}
-        Loading...
-    {:else}
-        <FlightDisplayer 
-            dataUrl={filePath}
-            frame={frame}
-            isLive={false}
-            isPlaying={isPlaying}
-            startReplayMethod={start_replay}
-            pauseReplayMethod={stop_replay}
-        />
-    {/if}
-</main>
+{#if isLoading}
+    <div class="loading">
+        <span class="spinner"><LoaderCircle size={28} /></span>
+        <p>Loading {fileNameOf(filePath)}…</p>
+    </div>
+{:else}
+    <FlightDisplayer
+        dataUrl={filePath}
+        frame={frame}
+        isLive={false}
+        isPlaying={isPlaying}
+        startReplayMethod={start_replay}
+        pauseReplayMethod={stop_replay}
+    />
+{/if}
+
+<style>
+    .loading {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        color: var(--text-muted);
+    }
+    .spinner { display: inline-flex; color: var(--accent); animation: spin 0.9s linear infinite; }
+</style>

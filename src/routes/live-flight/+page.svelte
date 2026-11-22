@@ -1,5 +1,4 @@
 <script lang="ts">
-import NavigationBar from '$lib/components/NavigationBar.svelte';
 import FlightDisplayer from '$lib/components/FlightDisplayer.svelte';
 
 import { invoke } from '@tauri-apps/api/core';
@@ -33,18 +32,13 @@ async function pauseReplay() {
 </script>
 
 <svelte:head>
-    <title>Live Flight</title>
+    <title>Live Flight · Homeward Link</title>
 </svelte:head>
 
-<main class="container">
-<title>Live Flight</title>
-<NavigationBar />
-
-<FlightDisplayer 
+<FlightDisplayer
     isLive={true}
     frame={frame}
     isPlaying={running}
     startReplayMethod={startReplay}
     pauseReplayMethod={pauseReplay}
-/> 
-</main>
+/>

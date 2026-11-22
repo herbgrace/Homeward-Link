@@ -1,5 +1,5 @@
 <script lang="ts">
-    import NavigationBar from "$lib/components/NavigationBar.svelte";
+    import { FolderClock, Radio, ArrowRight } from "@lucide/svelte";
     import ImageSlot from "$lib/components/ImageSlot.svelte";
 
     const features = [
@@ -20,10 +20,16 @@
         },
     ];
 
+    const hardware = [
+        { name: "TeleDongle", detail: "Ground station", href: "https://altusmetrum.org/TeleDongle/", img: "/img/home/teledongle.png" },
+        { name: "TeleMega", detail: "Flight computer", href: "https://altusmetrum.org/TeleMega/", img: "/img/home/telemega.png" },
+        { name: "ESP32 + MPU6050", detail: "Test board", href: "https://www.espressif.com/en/products/socs/esp32", img: "/img/home/esp32.png" },
+    ];
+
     const steps = [
-        "Connect your telemetry receiver, or pick a saved flight log.",
-        "Choose Live Flight or open a flight from Previous Flights.",
-        "Press Play and follow the data.",
+        { title: "Connect", text: "Connect your telemetry receiver, or pick a saved flight log." },
+        { title: "Choose", text: "Choose Live Flight or open a flight from Previous Flights." },
+        { title: "Follow", text: "Press Play and follow the data." },
     ];
 </script>
 
@@ -31,181 +37,198 @@
     <title>Homeward Link</title>
 </svelte:head>
 
-
-
-<main class="container">
-  <div class="nav">
-    <NavigationBar />
-  </div>
-  <!-- Hero -->
-  <div class="main-content">
+<div class="page">
     <section class="hero">
         <div class="hero-text">
-            <h1>Homeward Link</h1>
-            <p class="tagline">Follow your rocket from the pad to the field.</p>
-            <p>
-                Live telemetry and flight replay in one place, built for Altus Metrum
-                flight computers.
+            <span class="eyebrow">Telemetry for Altus Metrum flight computers</span>
+            <h1>Follow your rocket from the <span class="accent">pad</span> to the field.</h1>
+            <p class="lead">
+                Live telemetry and flight replay in one place — with a 3D view of the rocket and
+                cockpit-style instruments.
             </p>
+            <div class="cta">
+                <a class="btn btn-primary btn-lg" href="/previous-flights"><FolderClock size={16} />Open a previous flight</a>
+                <a class="btn btn-lg" href="/live-flight"><Radio size={16} />Go live</a>
+            </div>
         </div>
         <div class="hero-image">
-            <ImageSlot src="/img/home/hero.png" alt="Homeward Link Logo" ratio="4 / 5" label="Hero image: Homeward Link Logo (4:5)" />
+            <ImageSlot src="/img/home/hero.png" alt="Homeward Link logo" ratio="4 / 5" label="Hero image: Homeward Link Logo (4:5)" />
         </div>
     </section>
 
-    <!-- Features -->
     <section>
-        <h2>What it does</h2>
-        <div class="cards">
+        <h2 class="section-title">What it does</h2>
+        <div class="feature-grid">
             {#each features as f}
-                <article class="card">
-                    <ImageSlot src={f.img} alt={f.title} ratio="16 / 12" label="{f.title} (16:12)" />
-                    <h3>{f.title}</h3>
-                    <p>{f.text}</p>
+                <article class="card feature">
+                    <ImageSlot src={f.img} alt={f.title} ratio="16 / 11" label="{f.title} (16:11)" />
+                    <div class="feature-body">
+                        <h3>{f.title}</h3>
+                        <p>{f.text}</p>
+                    </div>
                 </article>
             {/each}
         </div>
     </section>
 
-    <!-- Hardware & files -->
-    <section class="works-with">
-      <h2>Works with</h2>
-      <div class="logos">
-        <figure>
-          <ImageSlot src="/img/home/teledongle.png" alt="TeleDongle" ratio="1 / 1" label="TeleDongle photo" />
-          <figcaption><a href="https://altusmetrum.org/TeleDongle/" target="_blank">TeleDongle ground station</a></figcaption>
-        </figure>
-        <figure>
-          <ImageSlot src="/img/home/telemega.png" alt="TeleMega" ratio="1 / 1" label="TeleMega photo" />
-          <figcaption><a href="https://altusmetrum.org/TeleMega/" target="_blank">TeleMega flight computer</a></figcaption>
-        </figure>
-        <figure>
-          <ImageSlot src="/img/home/esp32.png" alt="ESP32" ratio="1 / 1" label="ESP32 photo" />
-          <figcaption><a href="https://www.espressif.com/en/products/socs/esp32" target="_blank">ESP32</a> 
-            test board with an <a href="https://www.adafruit.com/product/3886" target="_blank">MPU6050 sensor</a>
-          </figcaption>
-        </figure>
-      </div>
-      <p class="small">Saved flights: <code>.telem</code> and <code>.csv</code> files.</p>
-    </section>
+    <div class="split">
+        <section>
+            <h2 class="section-title">Getting started</h2>
+            <ol class="steps">
+                {#each steps as s, i}
+                    <li>
+                        <span class="step-num">{i + 1}</span>
+                        <div>
+                            <strong>{s.title}</strong>
+                            <p>{s.text}</p>
+                        </div>
+                    </li>
+                {/each}
+            </ol>
+        </section>
 
-    <!-- Getting started -->
-    <section>
-      <h2>Getting started</h2>
-      <ol class="steps">
-          {#each steps as s}
-              <li>{s}</li>
-          {/each}
-      </ol>
-    </section>
-  </div>
-</main>
+        <section>
+            <h2 class="section-title">Works with</h2>
+            <div class="hardware">
+                {#each hardware as h}
+                    <a class="card hw" href={h.href} target="_blank" rel="noreferrer">
+                        <div class="hw-img"><ImageSlot src={h.img} alt={h.name} ratio="1 / 1" label={h.name} /></div>
+                        <div class="hw-text">
+                            <strong>{h.name}</strong>
+                            <span>{h.detail}</span>
+                        </div>
+                        <ArrowRight size={15} />
+                    </a>
+                {/each}
+            </div>
+            <p class="small">Saved flights: <code>.telem</code> and <code>.csv</code> files.</p>
+        </section>
+    </div>
+</div>
 
 <style>
-  a {
-    color: var(--text-color);
-  }
+    .page {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 3rem 1.5rem 4rem;
+        display: flex;
+        flex-direction: column;
+        gap: 3.5rem;
+    }
 
-  .main-content {
-    padding-left: 3rem;
-    padding-right: 3rem;
-  }
+    /* Hero */
+    .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, clamp(220px, 28vw, 340px));
+        gap: 3rem;
+        align-items: center;
+    }
 
-  .container {
-      max-width: 100%;
-      margin: 0 auto;
-      /* padding-left: 3rem;
-      padding-right: 3rem; */
-  }
+    .eyebrow {
+        display: inline-block;
+        padding: 0.25rem 0.65rem;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent-text);
+        font-size: 12px;
+        font-weight: 600;
+    }
 
-  section { margin-top: 3rem; }
+    h1 {
+        margin-top: 1rem;
+        font-size: clamp(2rem, 4vw, 3rem);
+        font-weight: 750;
+        letter-spacing: -0.03em;
+        line-height: 1.1;
+    }
 
-  h1 { 
-    font-size: 2.6rem; 
-    margin: 0 0 0.25rem; 
-  }
+    .accent { color: var(--accent); }
 
-  h2 { 
-    margin: 0 0 1rem; 
-  }
+    .lead {
+        margin-top: 1rem;
+        max-width: 540px;
+        font-size: 16px;
+        color: var(--text-muted);
+        line-height: 1.6;
+    }
 
-  h3 { 
-    margin: 0.75rem 0 0.25rem; 
-  }
+    .cta { display: flex; gap: 0.6rem; margin-top: 1.75rem; flex-wrap: wrap; }
+    .btn-lg { height: 40px; padding: 0 1.1rem; font-size: 14px; }
+    .cta a:hover { text-decoration: none; }
 
-  p  { 
-    line-height: 1.5; 
-  }
+    .hero-image :global(img), .hero-image :global(.placeholder) {
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md);
+    }
 
-  /* Hero */
-  .hero {
-      display: grid;
-      grid-template-columns: 1fr minmax(0, clamp(220px, 30vw, 360px));
-      gap: 2rem;
-      align-items: center;
-  }
+    /* Sections */
+    .section-title {
+        font-size: 13px;
+        font-weight: 650;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-subtle);
+        margin-bottom: 1rem;
+    }
 
-  .hero-image {
-    width: 100%;
-    max-width: clamp(220px, 30vw, 360px);
-    justify-self: end;
-  }
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1rem;
+    }
 
-  .tagline {
-    font-size: 1.2rem; 
-    font-weight: 600; 
-    margin: 0 0 1rem; 
-  }
+    .feature { overflow: hidden; }
+    .feature :global(img), .feature :global(.placeholder) { border-radius: 0; }
+    .feature-body { padding: 1rem 1.1rem 1.2rem; }
+    .feature h3 { font-size: 15px; margin-bottom: 0.35rem; }
+    .feature p { color: var(--text-muted); line-height: 1.55; }
 
-  /* Feature cards */
-  .cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.25rem;
-  }
-  .card {
-      background: var(--secondary-color, #f4f4f4);
-      border: 1px solid var(--accent-color, #ccc);
-      border-radius: 0.6rem;
-      padding: 1rem;
-  }
-  .card p { 
-    margin: 0; 
-  }
+    .split {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 3rem;
+    }
 
-  /* Works with */
-  .logos {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 200px));
-      place-content: center;
-      gap: 1.25rem;
-  }
+    /* Steps */
+    .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1rem; }
+    .steps li { display: flex; gap: 0.9rem; align-items: flex-start; }
+    .steps p { color: var(--text-muted); }
+    .step-num {
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--accent-soft);
+        color: var(--accent-text);
+        font-weight: 700;
+        font-size: 13px;
+        border: 1px solid var(--accent-soft-strong);
+    }
 
-  figure { 
-    margin: 0; 
-    text-align: center; 
-    width: fit-content; 
-  }
+    /* Hardware */
+    .hardware { display: flex; flex-direction: column; gap: 0.6rem; }
+    .hw {
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+        padding: 0.6rem 0.9rem 0.6rem 0.6rem;
+        color: var(--text);
+        transition: border-color 0.15s, background-color 0.15s;
+    }
+    .hw:hover { text-decoration: none; border-color: var(--accent); }
+    .hw:hover > :global(svg) { color: var(--accent); transform: translateX(2px); }
+    .hw > :global(svg) { color: var(--text-subtle); transition: transform 0.15s, color 0.15s; flex-shrink: 0; }
+    .hw-img { width: 48px; flex-shrink: 0; }
+    .hw-img :global(.placeholder) { font-size: 0; padding: 0; }
+    .hw-text { flex: 1; display: flex; flex-direction: column; }
+    .hw-text span { font-size: 12.5px; color: var(--text-muted); }
 
-  figcaption { 
-    margin-top: 0.4rem; 
-    font-size: 0.9rem; 
-    overflow: none; 
-  }
+    .small { margin-top: 0.9rem; font-size: 12.5px; color: var(--text-subtle); }
 
-  .small { 
-    font-size: 0.9rem; 
-    opacity: 0.8; 
-  }
-
-  /* Steps */
-  .steps { 
-    padding-left: 1.25rem; 
-    line-height: 1.8; 
-    list-style: none;
-  }
-
-  @media (max-width: 720px) {
-      .hero { grid-template-columns: 1fr; }
-  }
+    @media (max-width: 760px) {
+        .hero { grid-template-columns: 1fr; }
+        .hero-image { max-width: 280px; }
+    }
 </style>
