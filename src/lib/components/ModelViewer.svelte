@@ -153,6 +153,11 @@
     // Characteristic model size used to scale camera distances
     let modelRadius = 4;
 
+    // Object the cameras will be looking at
+    let camPivot: THREE.Group | undefined;
+    const target = new THREE.Vector3(0, 0, 0);
+    const box = new THREE.Box3();
+
     // Load GLB model
     const loader = new GLTFLoader();
     loader.load(
@@ -174,6 +179,7 @@
         const pivot = new THREE.Group();
         pivot.add(model);
         scene.add(pivot);
+        camPivot = pivot;
         modelRadius = Math.max(size.x, size.y, size.z, 0.5);
         groundBase = -size.y / 2 - 0.05;
         pad.scale.setScalar(Math.max(modelRadius / 4, 0.4));
@@ -188,7 +194,6 @@
     // Free-look controls (only active in "free" mode)
     let controls: OrbitControls | undefined;
     let activeMode: CameraMode | undefined;
-    const origin = new THREE.Vector3(0, 0, 0);
     const clock = new THREE.Timer();
 
     function setMode(mode: CameraMode) {
@@ -199,7 +204,7 @@
         const s = modelRadius / 4;
         camera.position.set(4 * s, 2.5 * s, 6 * s);
         controls = new OrbitControls(camera, renderer.domElement);
-        controls.target.copy(origin);
+        controls.target.copy(target);
         controls.enableDamping = true;
         controls.minDistance = modelRadius * 0.5;
         controls.maxDistance = modelRadius * 40;
@@ -211,38 +216,60 @@
       camera.updateProjectionMatrix();
     }
 
+    function updateTargetCenter(): THREE.Vector3 {
+      if (!camPivot) {
+        target.set(0, 0, 0);
+        return target;
+      }
+      camPivot.updateWorldMatrix(true, true);
+      box.setFromObject(camPivot);
+      if (!box.isEmpty()) {
+        box.getCenter(target);
+      } else {
+        target.set(0, 0, 0);
+      }
+      return target;
+    }
+
     function updateCamera(mode: CameraMode, elapsed: number, groundY: number) {
       const s = modelRadius / 4;
+      const center = updateTargetCenter();
       let fov = 45;
       switch (mode) {
         case "chase":
-          camera.position.set(0, 2 * s, 6 * s);
-          camera.lookAt(origin);
+          camera.position.set(center.x, center.y + 2 * s, center.z + 6 * s);
+          camera.lookAt(center);
           break;
         case "side":
-          camera.position.set(7.5 * s, 0.4 * s, 0);
-          camera.lookAt(origin);
+          camera.position.set(center.x + 7.5 * s, center.y + 0.4 * s, center.z);
+          camera.lookAt(center);
           break;
         case "top":
-          camera.position.set(0, 9 * s, 0.001);
-          camera.lookAt(origin);
+          camera.position.set(center.x, center.y + 9 * s, center.z + 0.001);
+          camera.lookAt(center);
           break;
         case "orbit": {
           const a = elapsed * 0.3;
-          camera.position.set(Math.sin(a) * 7 * s, 1.5 * s, Math.cos(a) * 7 * s);
-          camera.lookAt(origin);
+          camera.position.set(
+            center.x + Math.sin(a) * 7 * s, 
+            center.y + 1.5 * s, 
+            center.z + Math.cos(a) * 7 * s);
+          camera.lookAt(center);
           break;
         }
         case "ground": {
           // Stand on the field a short way from the pad and zoom to keep the rocket framed
-          camera.position.set(16 * s, groundY + 1.7, 12 * s);
-          camera.lookAt(origin);
-          const dist = camera.position.length();
+          camera.position.set(center.x + 16 * s, groundY + 1.7, center.z + 12 * s);
+          camera.lookAt(center);
+          const dist = camera.position.distanceTo(center);
           fov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan((modelRadius * 0.9) / dist)), 0.2, 50);
           break;
         }
         case "free":
-          controls?.update();
+          if (controls) {
+            controls.target.copy(center);
+            controls.update();
+          }
           break;
       }
       if (camera.fov !== fov && mode !== "free") {
