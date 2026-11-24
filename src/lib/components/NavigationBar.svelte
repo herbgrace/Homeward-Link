@@ -15,10 +15,10 @@ let settingsOpen = $state(false);
 </script>
 
 <header class="header-bar">
-    <a href="/" class="brand" aria-label="Homeward Link home">
+    <!-- <a href="/" class="brand" aria-label="Homeward Link home">
         <span class="brand-mark"><Rocket size={16} strokeWidth={2.25} /></span>
         <span class="brand-name">Homeward Link</span>
-    </a>
+    </a> -->
 
     <nav class="nav-links">
         {#each links as link}
@@ -30,7 +30,7 @@ let settingsOpen = $state(false);
         {/each}
     </nav>
 
-    <button class="btn btn-ghost btn-icon settings-button" aria-label="Settings" title="Settings" onclick={() => (settingsOpen = true)}>
+    <button class="btn btn-secondary btn-icon settings-button" aria-label="Settings" title="Settings" onclick={() => (settingsOpen = true)}>
         <Settings size={18} />
     </button>
 </header>
@@ -44,14 +44,14 @@ let settingsOpen = $state(false);
     display: flex;
     align-items: center;
     gap: 1.5rem;
-    padding: 0 1rem 0 1.25rem;
+    padding: 0 1rem 0 0.25rem;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     position: relative;
     z-index: 20;
 }
 
-.brand {
+/* .brand {
     display: flex;
     align-items: center;
     gap: 0.6rem;
@@ -75,7 +75,7 @@ let settingsOpen = $state(false);
     font-weight: 700;
     font-size: 15px;
     letter-spacing: -0.01em;
-}
+} */
 
 .nav-links {
     display: flex;
@@ -117,7 +117,7 @@ let settingsOpen = $state(false);
 .settings-button { margin-left: auto; }
 
 @media (max-width: 720px) {
-    .brand-name { display: none; }
+    /* .brand-name { display: none; } */
     .nav-link span { display: none; }
     .header-bar { gap: 0.5rem; }
 }
