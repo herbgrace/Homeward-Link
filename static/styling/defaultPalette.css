@@ -1,8 +1,8 @@
 /* ==========================================================================
-   Homeward Link - design tokens + base styles
-   Dark mode: graphite greys with the signature orange.
-   Light mode: warm off-white surfaces with a deeper orange for contrast.
-   Theme follows the OS unless <html data-theme="light|dark"> is set.
+    Homeward Link - design tokens + base styles
+    Dark mode: graphite greys with the signature orange.
+    Light mode: warm off-white surfaces with a deeper orange for contrast.
+    Theme follows the OS unless <html data-theme="light|dark"> is set.
    ========================================================================== */
 
 :root {
@@ -145,7 +145,7 @@
 }
 
 /* ==========================================================================
-   Base
+    Base
    ========================================================================== */
 
 *,
@@ -218,7 +218,7 @@ button {
 button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 /* ==========================================================================
-   Shared components
+    Shared components
    ========================================================================== */
 
 /* Buttons */
