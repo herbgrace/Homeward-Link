@@ -140,7 +140,7 @@ let visibleViews = $derived(visualLayout === "single" ? 1 : visualLayout === "fo
                 {#if isLive}
                     <span class="live-icon" class:on={isPlaying}><Radio size={16} /></span>
                     <h1>Live Telemetry</h1>
-                    <button class="btn btn-secondary reset-orientation-button" onclick={() => rotation = [0, 0, 0]}>Reset Orientation</button>
+                    <button class="btn btn-secondary reset-orientation-button" onclick={() => tracker.reset()}>Reset Orientation</button>
                     <span class="badge" class:badge-success={isPlaying}>
                         <span class="dot" class:pulse={isPlaying}></span>
                         {isPlaying ? "Receiving" : "Idle"}
