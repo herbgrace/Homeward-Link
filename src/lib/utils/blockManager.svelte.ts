@@ -92,7 +92,7 @@ async function load_new_block() {
 
     const res = await invoke<FlightData>('load_flight_block', { filePath });
 
-    console.log(res);
+    // console.log(res);
 
     let frames: Frame[];
     if (res.kind === 'table') {
@@ -102,7 +102,7 @@ async function load_new_block() {
         frames = res.data.snapshots.map(snapshotToFrame);
     }
 
-    console.log(frames);
+    // console.log(frames);
 
     if (loadIntoFirst) firstBlock = frames; else secondBlock = frames;
 }

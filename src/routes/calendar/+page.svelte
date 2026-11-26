@@ -1,7 +1,6 @@
 <script lang="ts">
 import { getLocalTimeZone, today, type CalendarDate } from "@internationalized/date";
 
-import NavigationBar from '$lib/components/NavigationBar.svelte';
 import { Calendar } from "$lib/components/ui/calendar/index.js";
 
 let value = $state<CalendarDate | undefined>(today(getLocalTimeZone()));
@@ -11,9 +10,7 @@ let value = $state<CalendarDate | undefined>(today(getLocalTimeZone()));
     <title>Calendar</title>
 </svelte:head>
 
-<main class="container">
-<title>Calendar</title>
-<NavigationBar />
+<main class="calendar-page">
 <div class="calendar-wrapper">
     <Calendar 
         type="single" 
@@ -25,6 +22,8 @@ let value = $state<CalendarDate | undefined>(today(getLocalTimeZone()));
 </main>
 
 <style>
+    .calendar-page { display: flex; justify-content: center; padding: 2rem 1rem; }
+
     /* target and neutralize generic button styles inside the calendar */
     :global(.calendar-wrapper button) {
         padding: 0 !important;
@@ -43,7 +42,8 @@ let value = $state<CalendarDate | undefined>(today(getLocalTimeZone()));
         flex-direction: column;
         align-content: center;
         align-items: center;
-        background-color: var(--secondary-color);
+        background-color: var(--surface);
+        border: 1px solid var(--border);
         padding: 0.75rem;
         width:fit-content;
         align-self: center;

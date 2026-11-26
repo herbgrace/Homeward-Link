@@ -75,7 +75,7 @@ const MS_HEADERS = ["relms", "currenttimemillis", "unixms"];
 const ROLL_HEADERS = ["roll", "x"];
 const PITCH_HEADERS = ["pitch", "y"];
 const YAW_HEADERS = ["yaw", "z"];
-const HEIGHT_HEADERS = ["height"]; //, "alt", "altitude"] // (Caused some errors since it's the starting alt + gained alt)
+const HEIGHT_HEADERS = ["height", "alt", "altitude"] // (Caused some errors since it's the starting alt + gained alt)
 const SPEED_HEADERS = ["speed"];
 const PRESSURE_HEADERS = ["pressure"]
 
@@ -146,11 +146,11 @@ export function snapshotToFrame(s: Snapshot): Frame {
     const { imu, kalman: k, gps, sats, config } = s.latest;
     const fields: Field[] = [];
     const add = (label: string, v: string | number | null | undefined) =>
-        fields.push({ label, value: v == null ? "—" : String(v) });
+        fields.push({ label, value: v == null ? "-" : String(v) });
 
-    let speedMs = ((): number => {
+    let speedMs = ((): number | undefined => {
         if (!k) {
-            return 0;
+            return undefined;
         } else {
             return parseFloat((k.speed / 16).toFixed(1));
         }
@@ -194,8 +194,8 @@ export function snapshotToFrame(s: Snapshot): Frame {
         } as RocketMotion : null,
         metrics: {
             speedMs: speedMs,
-            altitudeM: k?.height ?? 0,
-            pressurePa: imu?.pres ?? 0
+            altitudeM: k?.height ?? undefined,
+            pressurePa: imu?.pres ?? undefined
         }
     };
 }

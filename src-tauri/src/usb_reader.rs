@@ -94,6 +94,7 @@ fn parse_esp32(line: &str) -> Option<LiveTelemetry> {
 
 // ---------- Device profiles ----------
 
+#[derive(Debug)]
 struct DeviceProfile {
     name: &'static str,
     matches: fn(&UsbPortInfo) -> bool,
@@ -106,7 +107,7 @@ struct DeviceProfile {
 fn product_contains(info: &UsbPortInfo, needle: &str) -> bool {
     info.product
         .as_deref()
-        .map_or(false, |p| p.to_lowercase().contains(needle))
+        .map_or(false, |p| p.to_lowercase().contains(&needle.to_lowercase()))
 }
 
 const PROFILES: &[DeviceProfile] = &[
@@ -125,16 +126,18 @@ const PROFILES: &[DeviceProfile] = &[
     },
     DeviceProfile {
         name: "TeleDongle",
-        matches: |i| product_contains(i, "teledongle") || (i.vid == 0xFFFE && i.pid == 0x000C),
-        baud: 115_200,
-        init: None,  // TODO - determine if TeleDongle has a monitor command & replace when known
+        matches: |i| product_contains(i, "telebt") || (product_contains(i, "teledongle")) || (i.vid == 0xFFFE && i.pid == 0x000E),
+        baud: 9_600,
+        init: Some(b"m 20\n"),
         decoder: teledongle_decoder, 
         altos: true
     },
+    // serial.printf("l %d %d\n", launcher_serial, launcher_channel);
 ];
 
+// Correctly finds the TeleDongle
 fn find_device() -> Option<(String, &'static DeviceProfile)> {
-    let ports = serialport::available_ports().ok()?;
+    let ports = serialport::available_ports().ok()?; 
     ports.into_iter().find_map(|p| {
         let SerialPortType::UsbPort(ref info) = p.port_type else {
             return None;
@@ -210,6 +213,11 @@ fn run_session(
             Err(e) => return Err(e.into()),
         }
     }
+    // Stop the teledongle from reading telemetry data
+    if profile.altos {
+        let _ = reader.get_mut().write_all(b"m 0\n");
+    }
+    
     Ok(())
 }
 
@@ -345,9 +353,10 @@ mod tests {
     #[test]
     fn teledongle_profile_matches_by_ids_or_product_name() {
         let p = profile("TeleDongle");
-        assert!((p.matches)(&usb(0xFFFE, 0x000C, None)));
+        assert!((p.matches)(&usb(0xFFFE, 0x000E, None)));
         assert!((p.matches)(&usb(0x0000, 0x0000, Some("TeleDongle v3.0"))));
         assert!((p.matches)(&usb(0x0000, 0x0000, Some("my TELEDONGLE"))));
+        assert!((p.matches)(&usb(0x0000, 0x0000, Some("my TeleBT"))));
         assert!(!(p.matches)(&usb(0xFFFE, 0x000A, Some("TeleMetrum"))));
     }
 

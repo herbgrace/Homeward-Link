@@ -1,220 +1,230 @@
 <script lang="ts">
-import { fly } from 'svelte/transition';
-import { open } from '@tauri-apps/plugin-dialog'
+import { fly, fade } from 'svelte/transition';
 import { invoke } from '@tauri-apps/api/core';
-import { page } from '$app/state';
+import { X, Folder, Monitor, Sun, Moon } from '@lucide/svelte';
+import { chooseDataFolder, getDataPath } from '$lib/utils/savedFlightUtils';
+import { theme, setTheme, type ThemePreference } from '$lib/utils/theme.svelte';
 
 const MIN_BLOCK_SIZE = 5;
 const MAX_BLOCK_SIZE = 65535;
 
-let settingsOpen: boolean = $state(false);
-let displayPath: string = $state('Loading...');
-let blockSize: string = $state('Loading..');
-let error: string = $state("");
+let { open = $bindable(false) } = $props();
 
-let { displayedEntriesRefresh } = $props();
+let displayPath: string = $state('Loading...');
+let blockSize: string = $state('');
+let error: string = $state("");
+let saved: boolean = $state(false);
+
+const themeOptions: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
+    { value: "system", label: "System", icon: Monitor },
+    { value: "light", label: "Light", icon: Sun },
+    { value: "dark", label: "Dark", icon: Moon },
+];
 
 async function initSettings() {
-    displayPath = await invoke('get_data_path');
-    blockSize = await invoke('get_block_size')
-}
-
-function toggleSettings() {
-    settingsOpen = !settingsOpen;
+    try {
+        displayPath = await getDataPath();
+        blockSize = String(await invoke('get_block_size'));
+    } catch (e) {
+        error = "Unable to load settings";
+    }
 }
 
 async function changeDataPath() {
-    const path = await open({
-        multiple: false,
-        directory: true
-    });
+    const path = await chooseDataFolder();
+    if (path != null) displayPath = path;
+}
 
-    if (path == null) {
-        // User closed the dialog, no need to update anything
-        console.log("Update dialog closed")
+async function changeBlockSize() {
+    const blockNumber = parseInt(blockSize);
+    if (Number.isNaN(blockNumber) || blockNumber < MIN_BLOCK_SIZE || blockNumber > MAX_BLOCK_SIZE) {
+        error = `Block size must be between ${MIN_BLOCK_SIZE} and ${MAX_BLOCK_SIZE}`;
+        saved = false;
         return;
     }
-
-    displayPath = path;
-    invoke('update_data_path', {path: path});
-    if (page.url.pathname == '/previous-flights') {
-        // Show the replays from the new folder path
-        displayedEntriesRefresh();
-    }
+    await invoke('update_block_size', { newSize: blockNumber });
+    error = "";
+    saved = true;
+    setTimeout(() => (saved = false), 1500);
 }
 
-async function changeBlockSize(event: FocusEvent) {
-    let target = event.currentTarget
-    if (target instanceof(HTMLInputElement)) {
-        blockSize = target.value;
-        let blockNumber = parseInt(blockSize);
-
-        if ((blockNumber < MIN_BLOCK_SIZE) || (blockNumber > MAX_BLOCK_SIZE)) {
-            error = `Block size must be between ${MIN_BLOCK_SIZE} and ${MAX_BLOCK_SIZE}`;
-            return;
-        }
-
-        invoke('update_block_size', {newSize: blockNumber});
-        error = "";
-    } else {
-        error = "Unable to update block size"
-    }
+function onKeydown(e: KeyboardEvent) {
+    if (open && e.key === "Escape") open = false;
 }
 
-initSettings();
+$effect(() => {
+    if (open) initSettings();
+});
 </script>
 
-<button onclick={toggleSettings} class="open-button">
-    Settings
-</button>
+<svelte:window onkeydown={onKeydown} />
 
-{#if settingsOpen}
-    <aside class="sidebar" transition:fly={{x: 250, duration: 350}}>
-        <div class="settings-header"> 
+{#if open}
+    <div class="backdrop" transition:fade={{ duration: 150 }} onclick={() => (open = false)} role="presentation"></div>
+
+    <aside class="panel" transition:fly={{ x: 360, duration: 250, opacity: 1 }} aria-label="Settings">
+        <header class="panel-header">
             <h2>Settings</h2>
-            <button onclick={toggleSettings} class="close-button">
-                Close
+            <button class="btn btn-ghost btn-icon" aria-label="Close settings" onclick={() => (open = false)}>
+                <X size={18} />
             </button>
-        </div>
+        </header>
 
-        <div id="error-container">
-            <p id="error-message">{error}</p>
-        </div>
+        <div class="panel-body">
+            <section class="group">
+                <h3 class="group-title">Appearance</h3>
+                <div class="setting stacked">
+                    <div class="setting-label">
+                        <span>Theme</span>
+                        <small>Follow the system or pick a mode.</small>
+                    </div>
+                    <div class="segmented">
+                        {#each themeOptions as opt}
+                            <button class:active={theme.preference === opt.value} onclick={() => setTheme(opt.value)}>
+                                <opt.icon size={14} />
+                                {opt.label}
+                            </button>
+                        {/each}
+                    </div>
+                </div>
+            </section>
 
-        <ul class="settings-options">
-            <li id="data-folder" class="setting-line">
-                <p>Data Path</p>
-                <button onclick={changeDataPath}>
-                    {displayPath}
-                </button>
-            </li>
-            <li id="line-amount" class="setting-line">
-                <p>
-                    <span class="has-tooltip" tabindex="-1">
-                        CSV Loaded Line Amount
-                        <span class="tooltip">
-                            The number of lines that will be loaded in memory at a time when replaying a CSV flight. Less powerful systems might need to load less at a time.
-                        </span>
-                    </span>
-                </p>
-                <input type="text" value={blockSize} onblur={changeBlockSize}>
-            </li>
-        </ul>
+            <section class="group">
+                <h3 class="group-title">Data</h3>
+                <div class="setting stacked">
+                    <div class="setting-label">
+                        <span>Flight log folder</span>
+                        <small>Where Homeward Link looks for .telem and .csv files.</small>
+                    </div>
+                    <div class="path-row">
+                        <div class="path" title={displayPath}><Folder size={15} /><span>{displayPath}</span></div>
+                        <button class="btn" onclick={changeDataPath}>Change</button>
+                    </div>
+                </div>
+
+                <div class="setting stacked">
+                    <div class="setting-label">
+                        <label for="block-size">CSV lines loaded at a time</label>
+                        <small>How many lines are held in memory while replaying a CSV flight. Lower this on less powerful machines.</small>
+                    </div>
+                    <div class="path-row">
+                        <input
+                            id="block-size"
+                            class="input tabular"
+                            type="number"
+                            min={MIN_BLOCK_SIZE}
+                            max={MAX_BLOCK_SIZE}
+                            bind:value={blockSize}
+                            onblur={changeBlockSize}
+                            onkeydown={(e) => e.key === "Enter" && changeBlockSize()}
+                        />
+                        {#if saved}<span class="saved" transition:fade={{ duration: 120 }}>Saved</span>{/if}
+                    </div>
+                </div>
+
+                {#if error}
+                    <p class="error" role="alert">{error}</p>
+                {/if}
+            </section>
+        </div>
     </aside>
 {/if}
 
 <style>
-    button {
-        margin-left: auto;
-        display: flex;
-        align-self: flex-end;
-        margin-right: 0.5rem;
+    .backdrop {
+        position: fixed;
+        inset: 0;
+        background: var(--overlay);
+        z-index: 90;
     }
 
-    .close-button {
-        margin-right: 0.5rem;
-        justify-self: flex-start;
-        align-self: center;
-    }
-    
-    .sidebar {
-    position: fixed;
-    right: 0;
-    top: 0;
-    width: 300px;
-    height: 100%;
-    background: var(--secondary-color);
-    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-    padding: 1rem;
-    padding-top: 0.5rem;
-    border-color: var(--accent-color);
-    }
-
-    .settings-header {
-        display: flex;
-        align-items: center;
-    }
-
-    ul {
+    .panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(380px, 100vw);
+        background: var(--surface);
+        border-left: 1px solid var(--border);
+        box-shadow: var(--shadow-lg);
+        z-index: 100;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        list-style-type: none;
-        padding: 0;
-        flex-wrap: nowrap;
-        align-items: flex-start;
     }
 
-    li {
+    .panel-header {
         display: flex;
-        flex-direction: row;
         align-items: center;
-        white-space: nowrap;
-        width: 100%;
-        margin-right: 0.5rem;
-        padding-right: 0rem;
+        justify-content: space-between;
+        height: var(--header-height);
+        padding: 0 0.75rem 0 1.25rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .panel-header h2 { font-size: 16px; }
+
+    .panel-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.5rem 1.25rem 1.5rem;
+    }
+
+    .group { padding: 1rem 0; border-bottom: 1px solid var(--border); }
+    .group:last-child { border-bottom: none; }
+
+    .group-title {
+        font-size: 11px;
+        font-weight: 650;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-subtle);
+        margin-bottom: 0.75rem;
+    }
+
+    .setting {
+        display: flex;
         align-items: center;
-        flex-wrap: nowrap;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.5rem 0;
     }
 
-    p {
+    .setting.stacked { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+    .setting.stacked .segmented { align-self: flex-start; }
+
+    .setting-label { display: flex; flex-direction: column; gap: 0.15rem; }
+    .setting-label span, .setting-label label { font-weight: 550; }
+    .setting-label small { color: var(--text-muted); font-size: 12px; line-height: 1.45; }
+
+    .path-row { display: flex; align-items: center; gap: 0.5rem; }
+
+    .path {
+        flex: 1;
+        min-width: 0;
         display: flex;
-        padding-left: 0;
-        width: fit-content;
-        padding-right: 0.5rem;
+        align-items: center;
+        gap: 0.5rem;
+        height: 34px;
+        padding: 0 0.7rem;
+        border-radius: var(--radius-sm);
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        font-size: 12.5px;
     }
+    .path :global(svg) { flex-shrink: 0; color: var(--accent); }
+    .path span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    li button, input {
-        align-self: center;
-        display: flex;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scrollbar-color: var(--accent-color);
-        scrollbar-width: thin;
-        max-width: 75%;
-        min-width: 0;          /* lets it shrink inside the flex row */
+    #block-size { width: 120px; }
+
+    .saved { color: var(--success); font-size: 12px; font-weight: 550; }
+
+    .error {
+        margin-top: 0.5rem;
+        padding: 0.55rem 0.75rem;
+        border-radius: var(--radius-sm);
+        background: var(--danger-soft);
+        color: var(--danger);
+        font-size: 12.5px;
     }
-
-    li input {
-        margin-left: auto;     /* pushes the input to the right, like the button */
-    }
-
-    .has-tooltip {
-        position: relative;
-        text-decoration: underline;
-        text-decoration-style: dotted;
-        cursor: help;
-    }
-
-    .tooltip {
-        visibility: hidden;
-        opacity: 0;
-        position: absolute;
-        bottom: 130%;
-        left: 0;
-        width: max-content;
-        max-width: 200px;
-        white-space: normal;   /* li is nowrap, so allow the text to wrap here */
-        background-color: #333;
-        color: #fff;
-        padding: 6px 10px;
-        border-radius: 4px;
-        font-size: 0.85rem;
-        text-decoration: none;
-        pointer-events: none;
-        z-index: 10;
-        transition: opacity 0.2s ease-in-out;
-    }
-
-    .has-tooltip:hover .tooltip,
-    .has-tooltip:focus-visible .tooltip {
-        visibility: visible;
-        opacity: 1;
-    }
-
-    #error-message {
-        color: red;
-    }
-
-    /* TODO - change look of scrollbar to match the app's theme*/
 </style>

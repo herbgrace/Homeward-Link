@@ -56,6 +56,39 @@ pub async fn get_all_saved_flights(state: tauri::State<'_, state_controller::App
     return Ok(files);
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedFlightInfo {
+    path: String,
+    name: String,
+    extension: String,
+    size_bytes: u64,
+    modified_ms: Option<u64>,
+}
+
+// Same files as get_all_saved_flights, plus the metadata the library view shows
+#[tauri::command]
+pub async fn get_saved_flight_details(state: tauri::State<'_, state_controller::AppState>) -> Result<Vec<SavedFlightInfo>, String> {
+    let paths = get_all_saved_flights(state).await?;
+
+    let details = paths.into_iter().map(|p| {
+        let path = Path::new(&p);
+        let metadata = fs::metadata(path).ok();
+        SavedFlightInfo {
+            name: path.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string(),
+            extension: get_extension(path),
+            size_bytes: metadata.as_ref().map(|m| m.len()).unwrap_or(0),
+            modified_ms: metadata
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64),
+            path: p,
+        }
+    }).collect();
+
+    Ok(details)
+}
+
 fn get_extension(path: &Path) -> String {
     path.extension()
         .and_then(|e| e.to_str())
