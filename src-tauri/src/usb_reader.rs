@@ -107,7 +107,7 @@ struct DeviceProfile {
 fn product_contains(info: &UsbPortInfo, needle: &str) -> bool {
     info.product
         .as_deref()
-        .map_or(false, |p| p.to_lowercase().contains(&needle.to_lowercase())
+        .map_or(false, |p| p.to_lowercase().contains(&needle.to_lowercase()))
 }
 
 const PROFILES: &[DeviceProfile] = &[
