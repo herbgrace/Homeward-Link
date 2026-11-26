@@ -9,6 +9,7 @@ import {
     loadEntryDetails, getDataPath, chooseDataFolder, formatBytes, type SavedFlight,
 } from '$lib/utils/savedFlightUtils';
 import { libraryEvents } from '$lib/utils/libraryEvents.svelte';
+import { openPath } from '@tauri-apps/plugin-opener';
 
 type SortKey = "newest" | "oldest" | "name" | "size";
 type TypeFilter = "all" | "telem" | "csv";
@@ -59,6 +60,13 @@ async function changeFolder() {
     await chooseDataFolder();   // bumps libraryEvents, which triggers a refresh below
 }
 
+async function openSavedFolder() {
+    if (dataPath && dataPath != "") {
+        // console.log("Attempting to open " + dataPath);
+        await openPath(dataPath);
+    }
+}
+
 function openFlight(flight: SavedFlight) {
     const queryParams = new URLSearchParams({ filePath: flight.path });
     goto(`/display-previous-flight?${queryParams.toString()}`);
@@ -90,7 +98,10 @@ $effect(() => {
                 {:else}
                     {flights.length} {flights.length === 1 ? "flight log" : "flight logs"}
                     {#if dataPath}
-                        in <span class="folder" title={dataPath}><Folder size={13} />{dataPath}</span>
+                        in 
+                        <button onclick={openSavedFolder} class="btn-ghost">
+                            <span class="folder" title={dataPath}><Folder size={13} />{dataPath}</span>
+                        </button>
                     {/if}
                 {/if}
             </p>
@@ -129,7 +140,7 @@ $effect(() => {
             <select class="select" bind:value={sortKey} aria-label="Sort flights">
                 <option value="newest">Newest first</option>
                 <option value="oldest">Oldest first</option>
-                <option value="name">Name (A–Z)</option>
+                <option value="name">Name (A-Z)</option>
                 <option value="size">Largest first</option>
             </select>
         </label>
