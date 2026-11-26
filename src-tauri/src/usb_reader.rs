@@ -128,7 +128,7 @@ const PROFILES: &[DeviceProfile] = &[
         name: "TeleDongle",
         matches: |i| product_contains(i, "TeleBT") || (i.vid == 0xFFFE && i.pid == 0x000E),
         baud: 9_600,
-        init: Some(b"m 20\n"),  // TODO - determine if TeleDongle has a monitor command & replace when known
+        init: Some(b"m 20\n"),
         decoder: teledongle_decoder, 
         altos: true
     },
@@ -353,7 +353,7 @@ mod tests {
     #[test]
     fn teledongle_profile_matches_by_ids_or_product_name() {
         let p = profile("TeleDongle");
-        assert!((p.matches)(&usb(0xFFFE, 0x000C, None)));
+        assert!((p.matches)(&usb(0xFFFE, 0x000E, None)));
         assert!((p.matches)(&usb(0x0000, 0x0000, Some("TeleDongle v3.0"))));
         assert!((p.matches)(&usb(0x0000, 0x0000, Some("my TELEDONGLE"))));
         assert!(!(p.matches)(&usb(0xFFFE, 0x000A, Some("TeleMetrum"))));
