@@ -107,7 +107,7 @@ struct DeviceProfile {
 fn product_contains(info: &UsbPortInfo, needle: &str) -> bool {
     info.product
         .as_deref()
-        .map_or(false, |p| p.to_lowercase().contains(needle))
+        .map_or(false, |p| p.to_lowercase().contains(&needle.to_lowercase())
 }
 
 const PROFILES: &[DeviceProfile] = &[
@@ -126,7 +126,7 @@ const PROFILES: &[DeviceProfile] = &[
     },
     DeviceProfile {
         name: "TeleDongle",
-        matches: |i| product_contains(i, "TeleBT") || (product_contains(i, "teledongle")) || (i.vid == 0xFFFE && i.pid == 0x000E),
+        matches: |i| product_contains(i, "telebt") || (product_contains(i, "teledongle")) || (i.vid == 0xFFFE && i.pid == 0x000E),
         baud: 9_600,
         init: Some(b"m 20\n"),
         decoder: teledongle_decoder, 
@@ -356,6 +356,7 @@ mod tests {
         assert!((p.matches)(&usb(0xFFFE, 0x000E, None)));
         assert!((p.matches)(&usb(0x0000, 0x0000, Some("TeleDongle v3.0"))));
         assert!((p.matches)(&usb(0x0000, 0x0000, Some("my TELEDONGLE"))));
+        assert!((p.matches)(&usb(0x0000, 0x0000, Some("my TeleBT"))));
         assert!(!(p.matches)(&usb(0xFFFE, 0x000A, Some("TeleMetrum"))));
     }
 
