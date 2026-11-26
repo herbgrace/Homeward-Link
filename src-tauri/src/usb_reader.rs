@@ -126,7 +126,7 @@ const PROFILES: &[DeviceProfile] = &[
     },
     DeviceProfile {
         name: "TeleDongle",
-        matches: |i| product_contains(i, "TeleBT") || (i.vid == 0xFFFE && i.pid == 0x000E),
+        matches: |i| product_contains(i, "TeleBT") || (product_contains(i, "teledongle")) || (i.vid == 0xFFFE && i.pid == 0x000E),
         baud: 9_600,
         init: Some(b"m 20\n"),
         decoder: teledongle_decoder, 
