@@ -99,7 +99,7 @@ $effect(() => {
                     {flights.length} {flights.length === 1 ? "flight log" : "flight logs"}
                     {#if dataPath}
                         in 
-                        <button onclick={openSavedFolder} class="btn-ghost">
+                        <button onclick={openSavedFolder} class="btn btn-ghost" id="open-folder-btn">
                             <span class="folder" title={dataPath}><Folder size={13} />{dataPath}</span>
                         </button>
                     {/if}
@@ -229,6 +229,13 @@ $effect(() => {
 </div>
 
 <style>
+    #open-folder-btn {
+        padding: 0.15rem;
+        margin: 0;
+        height: fit-content;
+        width: fit-content;
+    }
+
     .page {
         max-width: 1080px;
         margin: 0 auto;
