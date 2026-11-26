@@ -94,6 +94,7 @@ fn parse_esp32(line: &str) -> Option<LiveTelemetry> {
 
 // ---------- Device profiles ----------
 
+#[derive(Debug)]
 struct DeviceProfile {
     name: &'static str,
     matches: fn(&UsbPortInfo) -> bool,
@@ -125,16 +126,18 @@ const PROFILES: &[DeviceProfile] = &[
     },
     DeviceProfile {
         name: "TeleDongle",
-        matches: |i| product_contains(i, "teledongle") || (i.vid == 0xFFFE && i.pid == 0x000C),
-        baud: 115_200,
-        init: None,  // TODO - determine if TeleDongle has a monitor command & replace when known
+        matches: |i| product_contains(i, "TeleBT") || (i.vid == 0xFFFE && i.pid == 0x000E),
+        baud: 9_600,
+        init: Some(b"m 20\n"),  // TODO - determine if TeleDongle has a monitor command & replace when known
         decoder: teledongle_decoder, 
         altos: true
     },
+    // serial.printf("l %d %d\n", launcher_serial, launcher_channel);
 ];
 
+// Correctly finds the TeleDongle
 fn find_device() -> Option<(String, &'static DeviceProfile)> {
-    let ports = serialport::available_ports().ok()?;
+    let ports = serialport::available_ports().ok()?; 
     ports.into_iter().find_map(|p| {
         let SerialPortType::UsbPort(ref info) = p.port_type else {
             return None;
@@ -210,6 +213,11 @@ fn run_session(
             Err(e) => return Err(e.into()),
         }
     }
+    // Stop the teledongle from reading telemetry data
+    if profile.altos {
+        let _ = reader.get_mut().write_all(b"m 0\n");
+    }
+    
     Ok(())
 }
 
